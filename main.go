@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 	"fmt"
+	"io/ioutil"
+	"encoding/json"
 	/*
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -11,6 +13,8 @@ import (
 )
 
 func initialize_aws() {
+	// load the creds
+	
 	// configure your aws region
 	//sess, err := session.NewSession(&aws.Config{Region: aws.String("us-east-2")})
 }
@@ -22,5 +26,5 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("[*] welcome to cuttlefish\n")
-	
+
 }
