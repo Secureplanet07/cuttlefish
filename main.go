@@ -44,7 +44,7 @@ func getCreds() creds {
 func initializeAWS() *session.Session {
 	// load the creds
 	getCreds()
-
+	
 	fmt.Println("[*] grabbing AWS session")
 
 	// set environmental variables
@@ -70,6 +70,8 @@ func initializeAWS() *session.Session {
 	fmt.Println("\t[+] successfully authenticated AWS session")
 	return sess
 }
+
+
 
 func main() {
 	if len(os.Args) < 2 {
