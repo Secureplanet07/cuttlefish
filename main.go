@@ -17,21 +17,48 @@ import (
 	//"github.com/aws/aws-sdk-go/service/ec2"
 )
 
-// global structs and vars
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~ global structs and vars ~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+// track number of prints to properly format 'flush' printing
 var number_of_prints int
 
+// struct to hold string value of AWS credentials
 type creds struct {
 	AccessKey string
 	SecretKey string
 }
 
-// struct to hold scan
+// struct to hold information about a scan
 type scan struct {
 	mutex *sync.RWMutex
 	name string
 	command string
 	results string
 	status string
+}
+
+// color escape characters for terminal printing
+var string_format = struct {
+	header string
+	blue string
+	green string
+	yellow string
+	red string
+	end string
+	bold string
+	underl string
+}{
+	header: "\033[95m",
+	blue: 	"\033[94m",
+	green: 	"\033[92m",
+	yellow: "\033[93m",
+	red: 	"\033[91m",
+	end: 	"\033[0m",
+	bold: 	"\033[1m",
+	underl: "\033[4m",
 }
 
 // getCreds()
@@ -59,6 +86,8 @@ func getCreds() creds {
 	return aws_creds
 }
 
+// returns an authenticated AWS API session object to use
+// for spinning up EC2 instances
 func initializeAWSSession() *session.Session{
 	// load the creds
 	aws_creds := getCreds()
@@ -90,6 +119,7 @@ func initializeAWSSession() *session.Session{
 	return sess
 }
 
+// performs an initial nmap scan on the target
 func nmapScan(target string, nmap_scan *scan) {
     nmap_scan.mutex.RLock()
 	nmap_scan.status = "running"
@@ -108,7 +138,8 @@ func nmapScan(target string, nmap_scan *scan) {
 	nmap_scan.mutex.RUnlock()
 }
 
-func echoTest(target string, echo_scan *scan) {
+// a test scan 
+func echoScan(target string, echo_scan *scan) {
 	result_string := fmt.Sprintf("echo returning for %v", target)
 	echo_scan.mutex.RLock()
 	echo_scan.status = "running"
@@ -122,11 +153,13 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 	for 1 > finished {
 		var completion_statuses []int
 		for i := 0; i < len(scans); i++ {
+			scans[i].mutex.RLock()
 			if scans[i].status == "complete" {
 				completion_statuses = append(completion_statuses, 1)
 			} else {
 				completion_statuses = append(completion_statuses, 0)
 			}
+			scans[i].mutex.RUnlock()
 		}
 		if allSame(completion_statuses) && completion_statuses[0] == 1 {
 			finished = 1
@@ -151,13 +184,22 @@ func trackedPrint(print_string string) {
 	number_of_prints += 1
 }
 
+func trackedColorPrint(print_string string, color string) {
+	fmt.Printf("%v%v%v\n", color, print_string, string_format.end)
+	number_of_prints += 1
+}
+
+func colorPrint(print_string string, color string) {
+	fmt.Printf("%v%v%v\n", color, print_string, string_format.end)
+}
+
 func outputProgress(scans []scan) {
 	x, _ := terminal.Width()
     //y, _ := terminal.Height()
 
     // this will buffer our output updating the scan results
     // without overwriting previous command line output
-    output_height := number_of_prints + 2
+    output_height := number_of_prints + 1
 	fmt.Printf("\033[%v;0H", output_height)
 	// overwrite with blank lines 
 	for i := 0; i < len(scans); i++ {
@@ -167,8 +209,18 @@ func outputProgress(scans []scan) {
 	fmt.Printf("\033[%v;0H", output_height)
 	// overwrite with updated scan results
 	for i := 0; i < len(scans); i++ {
-		to_write := fmt.Sprintf("\t[*] scan: %v (%v)\n", scans[i].name, scans[i].status)
-		fmt.Printf(to_write)
+		to_write := fmt.Sprintf("\t[*] scan: %v (%v)", scans[i].name, scans[i].status)
+		scans[i].mutex.RLock()
+		if scans[i].status == "complete" {
+			colorPrint(to_write, string_format.green)
+		} else if scans[i].status == "running" {
+			colorPrint(to_write, string_format.yellow)
+		} else if scans[i].status == "error" {
+			colorPrint(to_write, string_format.red)
+		} else {
+			colorPrint(to_write, string_format.blue)
+		}
+		scans[i].mutex.RUnlock()
 	}
 }
 
@@ -214,8 +266,9 @@ func main() {
 	// setup the scan channel
 	scan_channel := make(chan bool)
 	
+	// pass by reference so we update the shared struct value
 	go nmapScan(*target, &scans[0])
-	go echoTest(*target, &scans[1])
+	go echoScan(*target, &scans[1])
 	go scanProgress(scans, *target, scan_channel)
 	<-scan_channel
 	complete_string := fmt.Sprintf("[+] scan of %v complete!\n", *target)
