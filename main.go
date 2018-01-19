@@ -17,39 +17,39 @@ type creds struct {
 	AccessKey string
 	SecretKey string
 }
-var awscreds creds
 
 // getCreds()
 //	pull aws creds from creds.json
 func getCreds() creds {
 	fmt.Println("[*] loading aws credentials from ./creds.json")
+	var aws_creds creds
 	rawjson, err := ioutil.ReadFile("./creds.json")
 	if err != nil {
 		fmt.Println("\t[-]", err.Error())
 		os.Exit(1)
 	}
-	err = json.Unmarshal(rawjson, &awscreds)
+	err = json.Unmarshal(rawjson, &aws_creds)
 	if err != nil {
 		fmt.Println("\t[-]", err.Error())
 		os.Exit(1)
 	}
-	if len(awscreds.AccessKey) == 0 || len(awscreds.SecretKey) == 0 {
+	if len(aws_creds.AccessKey) == 0 || len(aws_creds.SecretKey) == 0 {
 		fmt.Println("\t[-] keys not loaded successfully")
 		os.Exit(1)
 	}
 	fmt.Println("\t[+] creds loaded from file successfully")
-	return awscreds
+	return aws_creds
 }
 
-func initializeAWS() *session.Session {
+func initializeAWSSession() *session.Session{
 	// load the creds
-	getCreds()
+	aws_creds := getCreds()
 	
 	fmt.Println("[*] grabbing AWS session")
 
 	// set environmental variables
-	akid_arg := []string{"AWS_ACCESS_KEY_ID", awscreds.AccessKey}
-	secret_arg := []string{"AWS_SECRET_ACCESS_KEY", awscreds.SecretKey}
+	akid_arg := []string{"AWS_ACCESS_KEY_ID", aws_creds.AccessKey}
+	secret_arg := []string{"AWS_SECRET_ACCESS_KEY", aws_creds.SecretKey}
 	env_sets := [][]string{akid_arg, secret_arg}
 	
 	for i := 0; i < len(env_sets); i++ {
@@ -80,8 +80,9 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("[*] welcome to cuttlefish")
-	//aws_sess := initializeAWS()
-	initializeAWS()
+	// aws_session := initializeAWSSession()
+	initializeAWSSession()
+
 }
 
 
