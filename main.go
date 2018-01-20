@@ -309,6 +309,13 @@ func identifyServices(nmap_output string) []service {
 	return identified_services
 }
 
+// TODO: transforms a list of services into a list of scans
+// converts services identified by nmap output into `scan` structs for
+// downstream processing.
+func makeServiceScanList([]service) []scan {
+	return []scan{}
+}
+
 func main() {
 	// sig-term handler
 	c := make(chan os.Signal, 2)
@@ -368,19 +375,19 @@ func main() {
 		getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), script scanning not performed", os.Getuid())
 		trackedColorPrint(getuid_string, string_format.yellow)
 		// "-vv", "-Pn", "-A", "-sS", "-T4", "-p-", 
-		nmap_scan.args = []string{"-vv", "-Pn", "-A", "-T4", "-p-", *target}
+		//nmap_scan.args = []string{"-vv", "-Pn", "-A", "-T4", "-p-", *target}
+		nmap_scan.args = []string{*target}
 	}
 	scans = append(scans, nmap_scan)
 
 	// setup the scan channel
-	scan_channel := make(chan bool)
+	recon_scan_channel := make(chan bool)
 	
 	// pass by reference so we update the shared struct value
 	go performScan(*target, &scans[0])
-	go scanProgress(scans, *target, scan_channel)
-	// block on scan channel 
-	<-scan_channel
-	complete_string := fmt.Sprintf("[+] scan of %v complete!\n", *target)
+	go scanProgress(scans, *target, recon_scan_channel)
+	// block on recon scan channel 
+	<-recon_scan_channel
 	log(scans[0].results)
 	
 	// now let's find services from the recon scan results
@@ -397,6 +404,16 @@ func main() {
 			identified_services[i].port)
 		colorPrint(service_string, string_format.green)
 	}
+
+	/* start new scans based on the service info
+	scans = makeServiceScanList(identified_services)
+	service_scan_channel := make(chan bool)
+	trackedPrint("[*] performing service scans")
+	for i := 0; i < len(scans); i++ {
+		go performScan(*target, &scans[i])
+	} //*/
+
+	complete_string := fmt.Sprintf("[+] cuttlefish scan of %v complete!\n", *target)
 	trackedPrint(complete_string)
 }
 
