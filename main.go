@@ -4,6 +4,7 @@ import (
 	"os"
 	"fmt"
 	"flag"
+	"math"
 	"sync"
 	"time"
 	"regexp"
@@ -27,8 +28,14 @@ import (
 ~~~~~~~ global structs and vars ~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+// start time (for log files)
+var scan_start = time.Now()
+
+var status_spin = []string{"\\","|","/","-"}
+
 // output log file
-var logging = false
+var logging = true
+var logfile_root_path string
 var logfile_path string
 
 // track number of prints to properly format 'flush' printing
@@ -163,20 +170,23 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 	for i := 0; i < len(scans); i++ {
 		to_write := fmt.Sprintf("\t[*] scan: %v (%v) [time elapsed: %.2fs]", scans[i].name, scans[i].status, scans[i].elapsed)
 		if logging {
-			log(to_write)
+			log(logfile_path, to_write)
 		}
 	}
+
+	iteration := 0
 	
 	for 1 > finished {
+		iteration += 1
 		var completion_statuses []int
 		for i := 0; i < len(scans); i++ {
 			scans[i].mutex.RLock()
 			current_time := time.Now()
 			time_elapsed := current_time.Sub(start_time).Seconds()
-			scans[i].elapsed = time_elapsed
 			if scans[i].status == "complete" {
 				completion_statuses = append(completion_statuses, 1)
 			} else {
+				scans[i].elapsed = time_elapsed
 				completion_statuses = append(completion_statuses, 0)
 			}
 			scans[i].mutex.RUnlock()
@@ -185,16 +195,23 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 			finished = 1
 
 		} else {
-			outputProgress(scans)
+			outputProgress(scans, iteration)
 		}
 	}
 	// log the finishes
 	for i := 0; i < len(scans); i++ {
-		to_write := fmt.Sprintf("\t[*] scan: %v (%v) [time elapsed: %.2fs]", scans[i].name, scans[i].status, scans[i].elapsed)
+		to_write := fmt.Sprintf("\t[+] scan: %v (%v) [time elapsed: %.2fs]", scans[i].name, scans[i].status, scans[i].elapsed)
 		if logging {
-			log(to_write)
+			log(logfile_path, to_write)
 		}
 	}
+	// write our actual scan loot outputs to a log file
+	for i := 0; i < len(scans); i++ {
+		scan_logfile_name := fmt.Sprintf("%v-%v-%v-.cuttlelog", target, scans[i].name, scan_start)
+		scan_logfile_path := filepath.Join(logfile_root_path, scan_logfile_name)
+		log(scan_logfile_path, scans[0].results)
+	}
+	
 	// update tracked prints for number of scans
 	number_of_prints += len(scans)
 	scan_channel <- true
@@ -209,13 +226,13 @@ func allSame(ints []int) bool {
 	return true
 }
 
-func log(message string) {
+func log(log_filepath string, message string) {
 	if logging {
 		var f *os.File
 		var err error
 		// path to logfile doesn't exist, create the file
-		if _, err := os.Stat(logfile_path); os.IsNotExist(err) {
-			f, err = os.Create(logfile_path)
+		if _, err := os.Stat(log_filepath); os.IsNotExist(err) {
+			f, err = os.Create(log_filepath)
 			f.Close()
 		}
 		defer f.Close()
@@ -224,7 +241,7 @@ func log(message string) {
 			colorPrint(error_mes, string_format.red, false, true)
 			os.Exit(1)
 		}
-		f, err = os.OpenFile(logfile_path, os.O_APPEND|os.O_WRONLY, 0600)
+		f, err = os.OpenFile(log_filepath, os.O_APPEND|os.O_WRONLY, 0600)
 		if err != nil {
 			error_mes := fmt.Sprintf("[-] cannot open log file\n\t%v\n", err)
 			colorPrint(error_mes, string_format.red, false, true)
@@ -242,7 +259,7 @@ func log(message string) {
 
 func regularPrint(print_string string, logging bool, tracking bool) {
 	if logging {
-		log(print_string)
+		log(logfile_path, print_string)
 	}
 	if tracking {
 		number_of_prints += 1
@@ -252,7 +269,7 @@ func regularPrint(print_string string, logging bool, tracking bool) {
 
 func colorPrint(print_string string, color string, logging bool, tracking bool) {
 	if logging {
-		log(print_string)
+		log(logfile_path, print_string)
 	}
 	if tracking {
 		number_of_prints += 1
@@ -265,7 +282,7 @@ func cleanup() {
 	os.Exit(1)
 }
 
-func outputProgress(scans []scan) {
+func outputProgress(scans []scan, iteration int) {
 	x, _ := terminal.Width()
 	//y, _ := terminal.Height()
 
@@ -281,7 +298,12 @@ func outputProgress(scans []scan) {
 	fmt.Printf("\033[%v;0H", output_height)
 	// overwrite with updated scan results
 	for i := 0; i < len(scans); i++ {
-		to_write := fmt.Sprintf("\t[*] scan: %v (%v) [time elapsed: %.2fs]", scans[i].name, scans[i].status, scans[i].elapsed)
+		status_character_idx := int(math.Floor(float64(iteration)/100)) % len(status_spin)
+		status_character := status_spin[status_character_idx]
+		if scans[i].status == "complete" {
+			status_character = "+"
+		}
+		to_write := fmt.Sprintf("\t[%v] scan: %v (%v) [time elapsed: %.2fs]", status_character, scans[i].name, scans[i].status, scans[i].elapsed)
 		scans[i].mutex.RLock()
 		if scans[i].status == "complete" {
 			colorPrint(to_write, string_format.green, false, false)
@@ -362,8 +384,9 @@ func main() {
 	flag.Parse()
 
 	// set up the log file path
-	logfile_name := fmt.Sprintf("%v-%v-.cuttlelog", *target, time.Now())
-	logfile_path = filepath.Join(*output_path, logfile_name)
+	logfile_root_path = *output_path
+	logfile_name := fmt.Sprintf("%v-cuttlemain-%v-.cuttlelog", *target, scan_start)
+	logfile_path = filepath.Join(logfile_root_path, logfile_name)
 
 	// clear the terminal
 	print("\033[H\033[2J")
@@ -409,17 +432,20 @@ func main() {
 		//nmap_scan.args = []string{"-vv", "-Pn", "-A", "-T4", "-p-", *target}
 		nmap_scan.args = []string{*target}
 	}
+	spoof_scan := scan{&sync.RWMutex{}, "spoof scan", "sleep", []string{"1"}, "", "initialized", 0}
 	scans = append(scans, nmap_scan)
+	scans = append(scans, spoof_scan)
 
 	// setup the scan channel
 	recon_scan_channel := make(chan bool)
 	
 	// pass by reference so we update the shared struct value
-	go performScan(*target, &scans[0])
+	for i := 0; i < len(scans); i++ {
+		go performScan(*target, &scans[i])
+	}
 	go scanProgress(scans, *target, recon_scan_channel)
 	// block on recon scan channel 
 	<-recon_scan_channel
-	log(scans[0].results)
 	
 	// now let's find services from the recon scan results
 	identified_services := identifyServices(scans[0].results)
