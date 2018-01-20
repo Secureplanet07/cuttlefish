@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"fmt"
-	//"net"
 	"flag"
 	"sync"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 	"os/exec"
+	"os/user"
 	"os/signal"
 	"io/ioutil"
 	"encoding/json"
@@ -55,6 +55,7 @@ type scan struct {
 type service struct {
 	name string
 	port string
+	status string
 }
 
 // color escape characters for terminal printing
@@ -209,31 +210,33 @@ func allSame(ints []int) bool {
 }
 
 func log(message string) {
-	var f *os.File
-	var err error
-	// path to logfile doesn't exist, create the file
-	if _, err := os.Stat(logfile_path); os.IsNotExist(err) {
-		f, err = os.Create(logfile_path)
-		f.Close()
-	}
-	defer f.Close()
-	if err != nil {
-		error_mes := fmt.Sprintf("[-] cannot create log file\n\t%v\n", err)
-		colorPrint(error_mes, string_format.red, false, true)
-		os.Exit(1)
-	}
-	f, err = os.OpenFile(logfile_path, os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		error_mes := fmt.Sprintf("[-] cannot open log file\n\t%v\n", err)
-		colorPrint(error_mes, string_format.red, false, true)
-		os.Exit(1)
-	}
-	to_write := fmt.Sprintf("%v\n", message)
-	num, err := f.WriteString(to_write)
-	if err != nil && num > 0 {
-		error_mes := fmt.Sprintf("[-] cannot write to log file\n\t%v\n", err)
-		colorPrint(error_mes, string_format.red, false, true)
-		os.Exit(1)
+	if logging {
+		var f *os.File
+		var err error
+		// path to logfile doesn't exist, create the file
+		if _, err := os.Stat(logfile_path); os.IsNotExist(err) {
+			f, err = os.Create(logfile_path)
+			f.Close()
+		}
+		defer f.Close()
+		if err != nil {
+			error_mes := fmt.Sprintf("[-] cannot create log file\n\t%v\n", err)
+			colorPrint(error_mes, string_format.red, false, true)
+			os.Exit(1)
+		}
+		f, err = os.OpenFile(logfile_path, os.O_APPEND|os.O_WRONLY, 0600)
+		if err != nil {
+			error_mes := fmt.Sprintf("[-] cannot open log file\n\t%v\n", err)
+			colorPrint(error_mes, string_format.red, false, true)
+			os.Exit(1)
+		}
+		to_write := fmt.Sprintf("%v\n", message)
+		num, err := f.WriteString(to_write)
+		if err != nil && num > 0 {
+			error_mes := fmt.Sprintf("[-] cannot write to log file\n\t%v\n", err)
+			colorPrint(error_mes, string_format.red, false, true)
+			os.Exit(1)
+		}
 	}
 }
 
@@ -293,20 +296,36 @@ func outputProgress(scans []scan) {
 	}
 }
 
+// identifies both open and closed running services
 func identifyServices(nmap_output string) []service {
 	// grab '22/tcp' from the beginning of the line
-	var validService = regexp.MustCompile(`^\d+/[a-z]+`)
+	var validService = regexp.MustCompile(`^(\d+/[a-z]+)\s+\w+\s+[A-z,a-z,0-9,-]+`)
 	// grab '  ssh  ' from the validated line
-	var serviceType = regexp.MustCompile(`  \w+  `)
+	//var serviceType = regexp.MustCompile(`\s[A-z,a-z,0-9,-]+`)
 	var identified_services []service
 	all_lines := strings.Split(nmap_output, "\n")
 	for i := 0; i < len(all_lines); i++  {
 		service_string := validService.FindString(all_lines[i])
 		if len(service_string) > 0 {
 			service_port := strings.Split(service_string, "/")[0]
-			service_name := serviceType.FindString(all_lines[i])
-			service_name = strings.Replace(service_name, "  ", "", 2)
-			new_service := service{service_name, service_port}
+
+			// holy mother of hacks...not proud of this
+			service_name := strings.Replace(service_string, "     ", " ", 100)
+			service_name = strings.Replace(service_string, "\t", " ", 100)
+			service_name = strings.Replace(service_string, "   ", " ", 100)
+			service_name = strings.Replace(service_string, "  ", " ", 100)
+			service_name_list := strings.Split(service_string, " ")
+			// we iterate through and remove all the empty strings
+			parsed_service_name_list := []string{}
+			for j := 0; j < len(service_name_list); j++ {
+				if len(service_name_list[j]) > 0 {
+					parsed_service_name_list = append(parsed_service_name_list, service_name_list[j])
+				}
+			}
+			service_name = parsed_service_name_list[2]
+			service_status := parsed_service_name_list[1]
+			new_service := service{service_name, service_port, service_status}
+
 			identified_services = append(identified_services, new_service)
 		}
 	}
@@ -321,6 +340,7 @@ func makeServiceScanList([]service) []scan {
 }
 
 func main() {
+	//
 	// sig-term handler
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -330,10 +350,15 @@ func main() {
 		os.Exit(1)
 	}()
 
+	// get home download dir for logging
+	usr, _ := user.Current()
+	dir := usr.HomeDir
+	default_log_dir := filepath.Join(dir, "Downloads")
+
 	// parse out the flags passed
 	target		:= flag.String("target", "d34db33f", "IP address of target machine")
 	tentacles 	:= flag.Int("tentacles", 0, "number of AWS 'tentacles' (default=0)")
-	output_path	:= flag.String("logfile", "~/Desktop", "location of output log file")
+	output_path	:= flag.String("logfile", default_log_dir, "location of output log file")
 	flag.Parse()
 
 	// set up the log file path
@@ -362,7 +387,9 @@ func main() {
 	opt_3 := fmt.Sprintf("[*] aws tentacles 				%v", *tentacles)
 	opt_4 := fmt.Sprintf("[*] enum modes: nmap")
 	regularPrint(opt_1, logging, true)
-	regularPrint(logfile_path_string, logging, true)
+	if logging {
+		regularPrint(logfile_path_string, logging, true)
+	}
 	regularPrint(opt_2, logging, true)
 	regularPrint(opt_3, logging, true)
 	regularPrint(opt_4, logging, true)
@@ -401,12 +428,16 @@ func main() {
 		colorPrint("\t[!] try different scan options", string_format.yellow, logging, true)
 		os.Exit(0)
 	}
-	colorPrint("[+] identified running services", string_format.green, logging, true)
+	colorPrint("[+] identified running services", string_format.blue, logging, true)
 	for i := 0; i < len(identified_services); i++ {
 		service_string := fmt.Sprintf("\t[+] %v (%v)", 
 			identified_services[i].name,
 			identified_services[i].port)
-		colorPrint(service_string, string_format.green, logging, true)
+		if identified_services[i].status == "open" {
+			colorPrint(service_string, string_format.green, logging, true)
+		} else {
+			colorPrint(service_string, string_format.red, logging, true)
+		}
 	}
 
 	/* start new scans based on the service info
@@ -415,10 +446,11 @@ func main() {
 	trackedPrint("[*] performing service scans")
 	for i := 0; i < len(scans); i++ {
 		go performScan(*target, &scans[i])
-	} //*/
+	} 
 
 	complete_string := fmt.Sprintf("[+] cuttlefish scan of %v complete!\n", *target)
 	regularPrint(complete_string, logging, true)
+	//*/
 }
 
 
