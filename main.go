@@ -6,6 +6,8 @@ import (
 	//"net"
 	"flag"
 	"sync"
+	"time"
+	"regexp"
 	"strings"
 	"os/exec"
 	"io/ioutil"
@@ -23,7 +25,7 @@ import (
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 // track number of prints to properly format 'flush' printing
-var number_of_prints int
+var number_of_prints = 0
 
 // struct to hold string value of AWS credentials
 type creds struct {
@@ -36,8 +38,16 @@ type scan struct {
 	mutex *sync.RWMutex
 	name string
 	command string
+	args []string
 	results string
 	status string
+	elapsed float64
+}
+
+// struct to hold information about an id'd service
+type service struct {
+	name string
+	port string
 }
 
 // color escape characters for terminal printing
@@ -119,41 +129,35 @@ func initializeAWSSession() *session.Session{
 	return sess
 }
 
-// performs an initial nmap scan on the target
-func nmapScan(target string, nmap_scan *scan) {
-    nmap_scan.mutex.RLock()
-	nmap_scan.status = "running"
-	nmap_scan.mutex.RUnlock()
-	command_string := fmt.Sprintf("nmap %v", target)
-	out, err := exec.Command("nmap", target).Output()
+// performs a scan for a passed command
+// command is an array of strings
+func performScan(target string, scan_to_perform *scan) {
+    scan_to_perform.mutex.RLock()
+	scan_to_perform.status = "running"
+	scan_to_perform.mutex.RUnlock()
+	out, err := exec.Command(scan_to_perform.command, scan_to_perform.args...).Output()
 	if err != nil {
-		error_string := fmt.Sprintf("[!] error running (%v)\n%v\n", 
-			command_string, err)
-		trackedPrint(error_string)
+		error_string := fmt.Sprintf("[!] error running (%v)\n\t%v", 
+			scan_to_perform.command, err)
+		colorPrint(error_string, string_format.red)
 		os.Exit(1)
 	}
-	nmap_scan.mutex.RLock()
-	nmap_scan.results = string(out)
-	nmap_scan.status = "complete"
-	nmap_scan.mutex.RUnlock()
-}
-
-// a test scan 
-func echoScan(target string, echo_scan *scan) {
-	result_string := fmt.Sprintf("echo returning for %v", target)
-	echo_scan.mutex.RLock()
-	echo_scan.status = "running"
-	echo_scan.results = result_string
-	echo_scan.status = "complete"
-	echo_scan.mutex.RUnlock()
+	scan_to_perform.mutex.RLock()
+	scan_to_perform.results = string(out)
+	scan_to_perform.status = "complete"
+	scan_to_perform.mutex.RUnlock()
 }
 
 func scanProgress(scans []scan, target string, scan_channel chan bool) {
+	start_time := time.Now()
 	finished := 0
 	for 1 > finished {
 		var completion_statuses []int
 		for i := 0; i < len(scans); i++ {
 			scans[i].mutex.RLock()
+			current_time := time.Now()
+			time_elapsed := current_time.Sub(start_time).Seconds()
+			scans[i].elapsed = time_elapsed
 			if scans[i].status == "complete" {
 				completion_statuses = append(completion_statuses, 1)
 			} else {
@@ -167,6 +171,8 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 			outputProgress(scans)
 		}
 	}
+	// update tracked prints for number of scans
+	number_of_prints += len(scans)
 	scan_channel <- true
 }
 
@@ -209,7 +215,7 @@ func outputProgress(scans []scan) {
 	fmt.Printf("\033[%v;0H", output_height)
 	// overwrite with updated scan results
 	for i := 0; i < len(scans); i++ {
-		to_write := fmt.Sprintf("\t[*] scan: %v (%v)", scans[i].name, scans[i].status)
+		to_write := fmt.Sprintf("\t[*] scan: %v (%v) [time elapsed: %.2fs]", scans[i].name, scans[i].status, scans[i].elapsed)
 		scans[i].mutex.RLock()
 		if scans[i].status == "complete" {
 			colorPrint(to_write, string_format.green)
@@ -224,9 +230,28 @@ func outputProgress(scans []scan) {
 	}
 }
 
+func identifyServices(nmap_output string) []service {
+	// grab '22/tcp' from the beginning of the line
+	var validService = regexp.MustCompile(`^\d+/[a-z]+`)
+	// grab '  ssh  ' from the validated line
+	var serviceType = regexp.MustCompile(`  \w+  `)
+	var identified_services []service
+	all_lines := strings.Split(nmap_output, "\n")
+	for i := 0; i < len(all_lines); i++  {
+		service_string := validService.FindString(all_lines[i])
+		if len(service_string) > 0 {
+			service_port := strings.Split(service_string, "/")[0]
+			service_name := serviceType.FindString(all_lines[i])
+			service_name = strings.Replace(service_name, "  ", "", 2)
+			new_service := service{service_name, service_port}
+			identified_services = append(identified_services, new_service)
+		}
+	}
+	return identified_services
+}
+
 func main() {
-	// set globals 
-	number_of_prints = 0
+
 	// parse out the flags passed
 	target		:= flag.String("target", "d34db33f", "IP address of target machine")
 	tentacles 	:= flag.Int("tentacles", 0, "number of AWS 'tentacles' (default=0)")
@@ -234,6 +259,7 @@ func main() {
 
 	// clear the terminal
 	print("\033[H\033[2J")
+	// make sure we're running as root
 	trackedPrint("[~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]")
 	trackedPrint("[~~~~~~~~~~~~\twelcome to cuttlefish\t~~~~~~~~~~~]")
 	trackedPrint("[~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]")
@@ -258,20 +284,44 @@ func main() {
 	
 	// initialized the scans
 	var scans []scan
-	nmap_scan := scan{&sync.RWMutex{}, "nmap", "nmap", "", "initialized"}
-	echo_scan := scan{&sync.RWMutex{}, "echo", "echo", "", "initialized"}
+	// nmap -vv -Pn -A -sC -sS -T 4 -p- TARGET
+	nmap_scan := scan{&sync.RWMutex{}, "initial nmap recon", "nmap", []string{}, "", "initialized", 0}
+	if os.Getuid() == 0 {
+		getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v), script scanning with nmap", os.Getuid())
+		trackedColorPrint(getuid_string, string_format.green)
+		nmap_scan.args = []string{"-vv", "-Pn", "-A", "-sC", "-sS", "-T4", "-p-", *target}
+	} else {
+		getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), script scanning not performed", os.Getuid())
+		trackedColorPrint(getuid_string, string_format.yellow)
+		// "-vv", "-Pn", "-A", "-sS", "-T4", "-p-", 
+		nmap_scan.args = []string{"-vv", "-Pn", "-A", "-T4", "-p-", *target}
+	}
 	scans = append(scans, nmap_scan)
-	scans = append(scans, echo_scan)
 
 	// setup the scan channel
 	scan_channel := make(chan bool)
 	
 	// pass by reference so we update the shared struct value
-	go nmapScan(*target, &scans[0])
-	go echoScan(*target, &scans[1])
+	go performScan(*target, &scans[0])
 	go scanProgress(scans, *target, scan_channel)
+	// block on scan channel 
 	<-scan_channel
 	complete_string := fmt.Sprintf("[+] scan of %v complete!\n", *target)
+	
+	// now let's find services from the recon scan results
+	identified_services := identifyServices(nmap_scan.results)
+	if len(identified_services) == 0 {
+		colorPrint("[-] no services identified", string_format.red)
+		colorPrint("\t[!] try different scan options", string_format.yellow)
+		os.Exit(0)
+	}
+	colorPrint("[+] identified running services", string_format.green)
+	for i := 0; i < len(identified_services); i++ {
+		service_string := fmt.Sprintf("\t[+] %v (%v)", 
+			identified_services[i].name,
+			identified_services[i].port)
+		colorPrint(service_string, string_format.green)
+	}
 	trackedPrint(complete_string)
 }
 
