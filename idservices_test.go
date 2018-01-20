@@ -84,9 +84,40 @@ func TestIdentifyServices1(t *testing.T) {
 }
 
 func TestIdentifyServices2(t *testing.T) {
+	nmap_output_2_results := [][]string{
+		[]string{"21","open","ftp"},
+		[]string{"22","open","ssh"},
+		[]string{"23","open","telnet"},
+		[]string{"25","open","smtp"},
+		[]string{"53","open","domain"},
+		[]string{"80","open","http"},
+		[]string{"111","open","rpcbind"},
+		[]string{"139","open","netbios-ssn"},
+		[]string{"445","open","microsoft-ds"},
+		[]string{"512","open","exec"},
+		[]string{"513","open","login"},
+		[]string{"514","open","shell"},
+		[]string{"1099","open","rmiregistry"},
+		[]string{"1524","open","ingreslock"},
+		[]string{"2049","open","nfs"},
+		[]string{"2121","open","ccproxy-ftp"},
+		[]string{"3306","open","mysql"},
+		[]string{"3389","closed","ms-wbt-server"},
+		[]string{"5432","open","postgresql"},
+		[]string{"5900","open","vnc"},
+		[]string{"6000","open","X11"},
+		[]string{"6667","open","irc"},
+		[]string{"8009","open","ajp13"},
+		[]string{"8180","open","unknown"},
+	}
 	identified := identifyServices(nmap_output_2)
-	if len(identified) != 24 {
+	if len(identified) != len(nmap_output_2_results) {
 		t.Errorf("didn't identify all running services\n")
+	}
+	for i := 0; i < len(nmap_output_2_results); i ++ {
+		if identified[i].name != nmap_output_2_results[i][2] {
+			t.Errorf("issues with service name parsing (%v:%v)", identified[i].name, nmap_output_2_results[i][2])
+		}
 	}
 }
 
