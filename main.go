@@ -28,6 +28,7 @@ import (
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 // output log file
+var logging = false
 var logfile_path string
 
 // track number of prints to properly format 'flush' printing
@@ -80,25 +81,25 @@ var string_format = struct {
 // getCreds()
 //	pull aws creds from creds.json
 func getCreds() creds {
-	trackedPrint("[*] loading aws credentials from ./creds.json")
+	regularPrint("[*] loading aws credentials from ./creds.json", logging, true)
 	var aws_creds creds
 	rawjson, err := ioutil.ReadFile("./creds.json")
 	if err != nil {
 		print_string := fmt.Sprintf("\t[-] %v", err.Error())
-		trackedPrint(print_string)
+		regularPrint(print_string, logging, true)
 		os.Exit(1)
 	}
 	err = json.Unmarshal(rawjson, &aws_creds)
 	if err != nil {
 		print_string := fmt.Sprintf("\t[-] %v", err.Error())
-		trackedPrint(print_string)
+		regularPrint(print_string, logging, true)
 		os.Exit(1)
 	}
 	if len(aws_creds.AccessKey) == 0 || len(aws_creds.SecretKey) == 0 {
-		trackedPrint("\t[-] keys not loaded successfully")
+		regularPrint("\t[-] keys not loaded successfully", logging, true)
 		os.Exit(1)
 	}
-	trackedPrint("\t[+] creds loaded from file successfully")
+	regularPrint("\t[+] creds loaded from file successfully", logging, true)
 	return aws_creds
 }
 
@@ -108,7 +109,7 @@ func initializeAWSSession() *session.Session{
 	// load the creds
 	aws_creds := getCreds()
 	
-	trackedPrint("[*] grabbing AWS session")
+	regularPrint("[*] grabbing AWS session", logging, true)
 
 	// set environmental variables
 	akid_arg := []string{"AWS_ACCESS_KEY_ID", aws_creds.AccessKey}
@@ -128,10 +129,10 @@ func initializeAWSSession() *session.Session{
 	_, crederr := sess.Config.Credentials.Get()
 	if crederr != nil {
 		print_string := fmt.Sprintf("\t[-] invalid credentials %v", err.Error())
-		trackedPrint(print_string)
+		regularPrint(print_string, logging, true)
 		os.Exit(0)
 	}
-	trackedPrint("\t[+] successfully authenticated AWS session")
+	regularPrint("\t[+] successfully authenticated AWS session", logging, true)
 	return sess
 }
 
@@ -145,7 +146,7 @@ func performScan(target string, scan_to_perform *scan) {
 	if err != nil {
 		error_string := fmt.Sprintf("[!] error running (%v)\n\t%v", 
 			scan_to_perform.command, err)
-		colorPrint(error_string, string_format.red)
+		colorPrint(error_string, string_format.red, logging, true)
 		os.Exit(1)
 	}
 	scan_to_perform.mutex.RLock()
@@ -160,7 +161,9 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 	// log the starts
 	for i := 0; i < len(scans); i++ {
 		to_write := fmt.Sprintf("\t[*] scan: %v (%v) [time elapsed: %.2fs]", scans[i].name, scans[i].status, scans[i].elapsed)
-		log(to_write)
+		if logging {
+			log(to_write)
+		}
 	}
 	
 	for 1 > finished {
@@ -187,7 +190,9 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 	// log the finishes
 	for i := 0; i < len(scans); i++ {
 		to_write := fmt.Sprintf("\t[*] scan: %v (%v) [time elapsed: %.2fs]", scans[i].name, scans[i].status, scans[i].elapsed)
-		log(to_write)
+		if logging {
+			log(to_write)
+		}
 	}
 	// update tracked prints for number of scans
 	number_of_prints += len(scans)
@@ -214,47 +219,46 @@ func log(message string) {
 	defer f.Close()
 	if err != nil {
 		error_mes := fmt.Sprintf("[-] cannot create log file\n\t%v\n", err)
-		colorPrint(error_mes, string_format.red)
+		colorPrint(error_mes, string_format.red, false, true)
 		os.Exit(1)
 	}
 	f, err = os.OpenFile(logfile_path, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		error_mes := fmt.Sprintf("[-] cannot open log file\n\t%v\n", err)
-		colorPrint(error_mes, string_format.red)
+		colorPrint(error_mes, string_format.red, false, true)
 		os.Exit(1)
 	}
 	to_write := fmt.Sprintf("%v\n", message)
 	num, err := f.WriteString(to_write)
 	if err != nil && num > 0 {
 		error_mes := fmt.Sprintf("[-] cannot write to log file\n\t%v\n", err)
-		colorPrint(error_mes, string_format.red)
+		colorPrint(error_mes, string_format.red, false, true)
 		os.Exit(1)
 	}
 }
 
-func trackedPrint(print_string string) {
-	log(print_string)
+func regularPrint(print_string string, logging bool, tracking bool) {
+	if logging {
+		log(print_string)
+	}
+	if tracking {
+		number_of_prints += 1
+	}
 	fmt.Printf("%v\n", print_string)
-	number_of_prints += 1
 }
 
-func trackedColorPrint(print_string string, color string) {
-	fmt.Printf("%v%v%v\n", color, print_string, string_format.end)
-	log(print_string)
-	number_of_prints += 1
-}
-
-func colorPrint(print_string string, color string) {
-	log(print_string)
-	fmt.Printf("%v%v%v\n", color, print_string, string_format.end)
-}
-
-func noLogColorPrint(print_string string, color string) {
+func colorPrint(print_string string, color string, logging bool, tracking bool) {
+	if logging {
+		log(print_string)
+	}
+	if tracking {
+		number_of_prints += 1
+	}
 	fmt.Printf("%v%v%v\n", color, print_string, string_format.end)
 }
 
 func cleanup() {
-	colorPrint("\n[!] caught Ctl-C ... cleaning up", string_format.yellow)
+	colorPrint("\n[!] caught Ctl-C ... cleaning up", string_format.yellow, logging, true)
 	os.Exit(1)
 }
 
@@ -277,13 +281,13 @@ func outputProgress(scans []scan) {
 		to_write := fmt.Sprintf("\t[*] scan: %v (%v) [time elapsed: %.2fs]", scans[i].name, scans[i].status, scans[i].elapsed)
 		scans[i].mutex.RLock()
 		if scans[i].status == "complete" {
-			noLogColorPrint(to_write, string_format.green)
+			colorPrint(to_write, string_format.green, false, false)
 		} else if scans[i].status == "running" {
-			noLogColorPrint(to_write, string_format.yellow)
+			colorPrint(to_write, string_format.yellow, false, false)
 		} else if scans[i].status == "error" {
-			noLogColorPrint(to_write, string_format.red)
+			colorPrint(to_write, string_format.red, false, false)
 		} else {
-			noLogColorPrint(to_write, string_format.blue)
+			colorPrint(to_write, string_format.blue, false, false)
 		}
 		scans[i].mutex.RUnlock()
 	}
@@ -339,12 +343,12 @@ func main() {
 	// clear the terminal
 	print("\033[H\033[2J")
 	// make sure we're running as root
-	trackedPrint("[~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]")
-	trackedPrint("[~~~~~~~~~~~~\twelcome to cuttlefish\t~~~~~~~~~~~]")
-	trackedPrint("[~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]")
+	regularPrint("[~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]", logging, true)
+	regularPrint("[~~~~~~~~~~~~\twelcome to cuttlefish\t~~~~~~~~~~~]", logging, true)
+	regularPrint("[~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]", logging, true)
 	// var aws_session *session.Session
 	if *target == "d34db33f" {
-		trackedPrint("[!] specify a target with '-target=TARGET_IP'")
+		regularPrint("[!] specify a target with '-target=TARGET_IP'", logging, true)
 		os.Exit(0)
 	}
 	if *tentacles > 0 {
@@ -357,11 +361,11 @@ func main() {
 	opt_2 := fmt.Sprintf("[*] target 				%v", *target)
 	opt_3 := fmt.Sprintf("[*] aws tentacles 				%v", *tentacles)
 	opt_4 := fmt.Sprintf("[*] enum modes: nmap")
-	trackedPrint(opt_1)
-	trackedPrint(logfile_path_string)
-	trackedPrint(opt_2)
-	trackedPrint(opt_3)
-	trackedPrint(opt_4)
+	regularPrint(opt_1, logging, true)
+	regularPrint(logfile_path_string, logging, true)
+	regularPrint(opt_2, logging, true)
+	regularPrint(opt_3, logging, true)
+	regularPrint(opt_4, logging, true)
 	
 	// initialized the scans
 	var scans []scan
@@ -369,11 +373,11 @@ func main() {
 	nmap_scan := scan{&sync.RWMutex{}, "initial nmap recon", "nmap", []string{}, "", "initialized", 0}
 	if os.Getuid() == 0 {
 		getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v), script scanning with nmap", os.Getuid())
-		trackedColorPrint(getuid_string, string_format.green)
+		colorPrint(getuid_string, string_format.green, logging, true)
 		nmap_scan.args = []string{"-vv", "-Pn", "-A", "-sC", "-sS", "-T4", "-p-", *target}
 	} else {
 		getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), script scanning not performed", os.Getuid())
-		trackedColorPrint(getuid_string, string_format.yellow)
+		colorPrint(getuid_string, string_format.yellow, logging, true)
 		// "-vv", "-Pn", "-A", "-sS", "-T4", "-p-", 
 		//nmap_scan.args = []string{"-vv", "-Pn", "-A", "-T4", "-p-", *target}
 		nmap_scan.args = []string{*target}
@@ -393,16 +397,16 @@ func main() {
 	// now let's find services from the recon scan results
 	identified_services := identifyServices(scans[0].results)
 	if len(identified_services) == 0 {
-		colorPrint("[-] no services identified", string_format.red)
-		colorPrint("\t[!] try different scan options", string_format.yellow)
+		colorPrint("[-] no services identified", string_format.red, logging, true)
+		colorPrint("\t[!] try different scan options", string_format.yellow, logging, true)
 		os.Exit(0)
 	}
-	colorPrint("[+] identified running services", string_format.green)
+	colorPrint("[+] identified running services", string_format.green, logging, true)
 	for i := 0; i < len(identified_services); i++ {
 		service_string := fmt.Sprintf("\t[+] %v (%v)", 
 			identified_services[i].name,
 			identified_services[i].port)
-		colorPrint(service_string, string_format.green)
+		colorPrint(service_string, string_format.green, logging, true)
 	}
 
 	/* start new scans based on the service info
@@ -414,7 +418,7 @@ func main() {
 	} //*/
 
 	complete_string := fmt.Sprintf("[+] cuttlefish scan of %v complete!\n", *target)
-	trackedPrint(complete_string)
+	regularPrint(complete_string, logging, true)
 }
 
 
