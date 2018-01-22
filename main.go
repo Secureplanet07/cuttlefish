@@ -223,8 +223,8 @@ func performScan(target string, scan_to_perform *scan) {
 	scan_to_perform.mutex.RUnlock()
 	out, err := exec.Command(scan_to_perform.command, scan_to_perform.args...).Output()
 	if err != nil {
-		error_string := fmt.Sprintf("[!] error running (%v)", 
-			scan_to_perform.command)
+		error_string := fmt.Sprintf("%v:%v", 
+			scan_to_perform.command, err)
 		error_log_string := fmt.Sprintf("[!] error running (%v)\n\t%v", 
 			scan_to_perform.command, err)
 		if logging {
@@ -268,7 +268,11 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 					log(scan_logfile_path, scans[i].results)
 					
 					// log the finishes to main log file
-					to_write := fmt.Sprintf("\t[+] scan: %v (%v) [time elapsed: %.2fs]", scans[i].name, scans[i].status, scans[i].elapsed)
+					complete_char := "+"
+					if scans[i].status == "error" {
+						complete_char = "!"
+					}
+					to_write := fmt.Sprintf("\t[%v] scan: %v (%v) [time elapsed: %.2fs]", complete_char, scans[i].name, scans[i].status, scans[i].elapsed)
 					log(logfile_path, to_write)
 				}
 			} else {
@@ -278,6 +282,8 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 			scans[i].mutex.RUnlock()
 		}
 		if allSame(completion_statuses) && completion_statuses[0] == 1 {
+			// print the final state
+			outputProgress(scans, iteration)
 			finished = 1
 
 		} else {
@@ -309,6 +315,8 @@ func outputProgress(scans []scan, iteration int) {
 		status_character := status_spin[status_character_idx]
 		if scans[i].status == "complete" {
 			status_character = "+"
+		} else if scans[i].status == "error" {
+			status_character = "!"
 		}
 		to_write := fmt.Sprintf("\t[%v] scan: %v (%v) [time elapsed: %.2fs]", status_character, scans[i].name, scans[i].status, scans[i].elapsed)
 		scans[i].mutex.RLock()
@@ -381,7 +389,9 @@ func makeServiceScanList(target string, service_list []service) []scan {
 		// set up scans for identified services
 		if current_service.name == "ssh" {
 			// -L wordlists/userlist -P wordlists/offsecpass -f -o results/%s_sshhydra.txt -u %s -s %s ssh
-			hydra_args := []string{"-L", "~/Documents/tools/SecLists/Usernames/top_shortlist.txt", "-f", "-u", target, "-s", current_service.port, "ssh"}
+			user_wordlist := "~/Documents/tools/SecLists/Usernames/top_shortlist.txt"
+			user_passlist := "~/Documents/tools/SecLists/Passwords/best1050.txt"
+			hydra_args := []string{"-L", user_wordlist, "-P", user_passlist, "-f", "-u", target, "-s", current_service.port, "ssh"}
 			new_scan := scan{&sync.RWMutex{}, "ssh hydra brute", "hydra", hydra_args, "", "initialized", 0}
 			service_scan_list = append(service_scan_list, new_scan)
 		} else if current_service.name == "http" {
