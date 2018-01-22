@@ -452,7 +452,15 @@ func main() {
 	target		:= flag.String("target", "d34db33f", "IP address of target machine")
 	tentacles 	:= flag.Int("tentacles", 0, "number of AWS 'tentacles' (default=0)")
 	output_path	:= flag.String("logfile", default_log_dir, "location of output log file")
+	testing		:= flag.Bool("testing", false, "use test executables for enum output")
 	flag.Parse()
+
+	// if testing, set the os to use the CWD as an executable path
+	if *testing {
+		current_path := os.Getenv("PATH")
+		new_path := fmt.Sprintf("$(cwd):%v", current_path)
+		os.Setenv("PATH", new_path)
+	}
 
 	// set up the log file path
 	cuttletarget_dir := fmt.Sprintf("%v-cuttlefish-enum", *target)
