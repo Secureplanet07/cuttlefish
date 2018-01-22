@@ -36,7 +36,7 @@ var term_height, _ = terminal.Height()
 var status_spin = []string{"\\","|","/","-"}
 
 // output log file
-var logging = false
+var logging = true
 var logfile_root_path string
 var logfile_path string
 
@@ -455,7 +455,7 @@ func main() {
 	flag.Parse()
 
 	// set up the log file path
-	cuttletarget_dir := fmt.Sprintf("%v-cuttlefish-enum-%v", *target, scan_start)
+	cuttletarget_dir := fmt.Sprintf("%v-cuttlefish-enum", *target)
 	logfile_root_path = filepath.Join(*output_path, cuttletarget_dir)
 	logfile_name := fmt.Sprintf("%v-cuttlemain-%v-.cuttlelog", *target, scan_start)
 	logfile_path = filepath.Join(logfile_root_path, logfile_name)
@@ -508,7 +508,7 @@ func main() {
 	var scans []scan
 	nmap_tcp_scan := scan{&sync.RWMutex{}, "initial nmap TCP recon", "nmap", []string{}, "", "initialized", 0, false}
 	nmap_udp_scan := scan{&sync.RWMutex{}, "initial nmap UDP recon", "nmap", []string{}, "", "initialized", 0, false}
-	spoof_scan := scan{&sync.RWMutex{}, "spoof scan", "sleep", []string{"1"}, "", "initialized", 0, false}
+	spoof_scan := scan{&sync.RWMutex{}, "user scan", "whoami", []string{}, "", "initialized", 0, false}
 	if os.Getuid() == 0 {
 		getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v), script scanning with nmap", os.Getuid())
 		colorPrint(getuid_string, string_format.green, logging, true)
