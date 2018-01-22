@@ -435,9 +435,22 @@ func main() {
 	flag.Parse()
 
 	// set up the log file path
-	logfile_root_path = *output_path
+	cuttletarget_dir := fmt.Sprintf("%v-cuttlefish-enum", *target)
+	logfile_root_path = filepath.Join(*output_path, cuttletarget_dir)
 	logfile_name := fmt.Sprintf("%v-cuttlemain-%v-.cuttlelog", *target, scan_start)
 	logfile_path = filepath.Join(logfile_root_path, logfile_name)
+
+	// create the file directory if we are logging ::TODO::
+	if logging {
+		err := os.MkdirAll(logfile_root_path, os.ModePerm)
+		if err != nil {
+			error_mes := fmt.Sprintf("[!] could not create logging path (%v)..disabling logging", logfile_root_path)
+			colorPrint(error_mes, string_format.red, false, true)
+			error_str := fmt.Sprintf("error: %v", err)
+			colorPrint(error_str, string_format.red, false, true)
+			logging = false
+		}
+	}
 
 	// clear the terminal
 	print("\033[H\033[2J")
@@ -532,7 +545,7 @@ func main() {
 	go scanProgress(scans, *target, service_scan_channel)
 	<-service_scan_channel
 
-	complete_string := fmt.Sprintf("[+] cuttlefish scan of %v complete!\n", *target)
+	complete_string := fmt.Sprintf("[+] cuttlefish enumeration of %v complete!\n", *target)
 	regularPrint(complete_string, logging, true)
 }
 
