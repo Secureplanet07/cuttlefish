@@ -111,16 +111,18 @@ func log(log_filepath string, message string) {
 			f, err = os.Create(log_filepath)
 			f.Close()
 		}
-		defer f.Close()
 		if err != nil {
 			error_mes := fmt.Sprintf("[-] cannot create log file\n\t%v\n", err)
 			colorPrint(error_mes, string_format.red, false, true)
+			f.Close()
 			os.Exit(1)
 		}
+		defer f.Close()
 		f, err = os.OpenFile(log_filepath, os.O_APPEND|os.O_WRONLY, 0600)
 		if err != nil {
 			error_mes := fmt.Sprintf("[-] cannot open log file\n\t%v\n", err)
 			colorPrint(error_mes, string_format.red, false, true)
+			f.Close()
 			os.Exit(1)
 		}
 		to_write := fmt.Sprintf("%v\n", message)
@@ -128,8 +130,10 @@ func log(log_filepath string, message string) {
 		if err != nil && num > 0 {
 			error_mes := fmt.Sprintf("[-] cannot write to log file\n\t%v\n", err)
 			colorPrint(error_mes, string_format.red, false, true)
+			f.Close()
 			os.Exit(1)
 		}
+		f.Close()
 	}
 }
 
@@ -223,13 +227,17 @@ func performScan(target string, scan_to_perform *scan) {
 			scan_to_perform.command)
 		error_log_string := fmt.Sprintf("[!] error running (%v)\n\t%v", 
 			scan_to_perform.command, err)
-		log(logfile_path, error_string)
+		if logging {
+			log(logfile_path, error_log_string)
+		}
 		scan_to_perform.status = "error"
 		scan_to_perform.name = error_string
 	}
 	scan_to_perform.mutex.RLock()
 	scan_to_perform.results = string(out)
-	scan_to_perform.status = "complete"
+	if scan_to_perform.status != "error" {
+		scan_to_perform.status = "complete"
+	}
 	scan_to_perform.mutex.RUnlock()
 }
 
@@ -251,7 +259,7 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 			scans[i].mutex.RLock()
 			current_time := time.Now()
 			time_elapsed := current_time.Sub(start_time).Seconds()
-			if scans[i].status == "complete" {
+			if scans[i].status == "complete" || scans[i].status == "error" {
 				completion_statuses = append(completion_statuses, 1)
 				if logging {
 					// write our actual scan loot outputs to a log file
@@ -496,6 +504,8 @@ func main() {
 	colorPrint("[*] starting follow up scans on identified services", string_format.blue, logging, true)
 	// start new scans based on the service info
 	scans = makeServiceScanList(*target, identified_services)
+	// TESTING: add spoof scan
+	scans = append(scans, spoof_scan)
 	service_scan_channel := make(chan bool)
 	for i := 0; i < len(scans); i++ {
 		go performScan(*target, &scans[i])
