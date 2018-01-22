@@ -121,14 +121,39 @@ func TestIdentifyServices2(t *testing.T) {
 	}
 }
 
+/*
 func TestMakeServiceScanList(t *testing.T) {
 	identified := identifyServices(nmap_output_2)
 	service_scan_list := makeServiceScanList("t3st1ng", identified)
-	if len(service_scan_list) < 24 {
-		t.Errorf("expected 24 services...identified %v", len(service_scan_list))
+	if len(service_scan_list) != 7 {
+		t.Errorf("expected 7 services \n(\n\tssh,\n\tsmtp,\n\tsnmp,\n\tdomain,\n\tftp,\n\tmicrosoft-ds,\n\tms-sql\n)\n...identified %v", len(service_scan_list))
+	}
+} //*/
+
+func TestRemoveDuplicateServices(t *testing.T) {
+	service_list_1 := []service {
+		service{"ssh", "22", "initialized"},
+		service{"http", "80", "initialized"},
+		service{"ssh", "31337", "initialized"},
+	}
+	service_list_2 := []service {
+		service{"ssh", "22", "initialized"},
+	}
+
+	dups_1 := removeDuplicateServices(service_list_1)
+	if len(dups_1) < 3 {
+		t.Errorf("expected 3 services, got %v", len(dups_1))
+	}
+	dups_2 := removeDuplicateServices(service_list_2)
+	if len(dups_2) != 1 {
+		t.Errorf("expected 1 service, got %v", len(dups_2))
+	}
+	dups_3 := append(dups_1, dups_2...)
+	dups_3 = removeDuplicateServices(dups_3)
+	if len(dups_3) != 3 {
+		t.Errorf("expected 3 services, got %v", len(dups_3))
 	}
 }
-
 
 
 

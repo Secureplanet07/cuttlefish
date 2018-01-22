@@ -36,12 +36,18 @@ var term_height, _ = terminal.Height()
 var status_spin = []string{"\\","|","/","-"}
 
 // output log file
-var logging = true
+var logging = false
 var logfile_root_path string
 var logfile_path string
 
 // track number of prints to properly format 'flush' printing
 var number_of_prints = 0
+
+// arguments to scans
+var hydra_default_user_wordlist = 	"~/Documents/tools/SecLists/Usernames/top_shortlist.txt"
+var hydra_default_user_passlist = 	"~/Documents/tools/SecLists/Passwords/best1050.txt"
+var gobuster_default_dirlist = 		"~/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
+var gobuster_default_filelist = 	"~/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt"
 
 // struct to hold string value of AWS credentials
 type creds struct {
@@ -263,7 +269,7 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 			if scans[i].status == "complete" || scans[i].status == "error" {
 				completion_statuses = append(completion_statuses, 1)
 				// gross..but prevents a logging:false, logged=true loop write
-				if logging && scans[i].logged == false {
+				if logging && (scans[i].logged == false) {
 					// write our actual scan loot outputs to a log file
 					scan_logfile_name := fmt.Sprintf("%v-%v-%v-.cuttlelog", target, scans[i].command, scan_start)
 					scan_logfile_path := filepath.Join(logfile_root_path, scan_logfile_name)
@@ -273,8 +279,6 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 					} else {
 						log(scan_logfile_path, scans[i].results)
 					}
-					
-					
 					// log the finishes to main log file
 					complete_char := "+"
 					if scans[i].status == "error" {
@@ -378,6 +382,23 @@ func identifyServices(nmap_output string) []service {
 	return identified_services
 }
 
+func removeDuplicateServices(service_list []service) []service {
+	unique_services := []service{}
+	for i := 0; i < len(service_list); i++ {
+		hits := 0
+		for j := 0; j < len(unique_services); j++ {
+			if unique_services[j].name == service_list[i].name && 
+				unique_services[j].port == service_list[i].port {
+					hits += 1
+			}
+		}
+		if hits == 0 {
+			unique_services = append(unique_services, service_list[i])
+		}
+	}
+	return unique_services
+}
+
 // TODO: transforms a list of services into a list of scans
 // converts services identified by nmap output into `scan` structs for
 // downstream processing.
@@ -391,23 +412,22 @@ func makeServiceScanList(target string, service_list []service) []scan {
 		-ftp
 		-microsoft-ds
 		-ms-sql
+		-http/s
 	*/
 	service_scan_list := []scan{}
 	for i := 0; i < len(service_list); i++ {
 		current_service := &service_list[i]
 		// set up scans for identified services
 		if current_service.name == "ssh" {
-			// -L wordlists/userlist -P wordlists/offsecpass -f -o results/%s_sshhydra.txt -u %s -s %s ssh
-			user_wordlist := "~/Documents/tools/SecLists/Usernames/top_shortlist.txt"
-			user_passlist := "~/Documents/tools/SecLists/Passwords/best1050.txt"
-			hydra_args := []string{"-L", user_wordlist, "-P", user_passlist, "-f", "-u", target, "-s", current_service.port, "ssh"}
+			hydra_args := []string{"-L", hydra_default_user_wordlist, "-P", hydra_default_user_passlist, "-f", "-u", target, "-s", current_service.port, "ssh"}
 			new_scan := scan{&sync.RWMutex{}, "ssh hydra brute", "hydra", hydra_args, "", "initialized", 0, false}
 			service_scan_list = append(service_scan_list, new_scan)
 		} else if current_service.name == "http" {
-			gobuster_args := []string{}
+			gobuster_args := []string{"-u", target, "-w", gobuster_default_dirlist}
 			new_scan := scan{&sync.RWMutex{}, "gobuster enumeration", "gobuster", gobuster_args, "", "initialized", 0, false}
 			service_scan_list = append(service_scan_list, new_scan)
 		}
+		// nmap -vv -sV -Pn -p %s --script=ms-sql-info,ms-sql-config,ms-sql-dump-hashes --script-args=mssql.instance-port=1433,smsql.username-sa,mssql.password-sa
 	}
 	return service_scan_list
 }
@@ -435,12 +455,12 @@ func main() {
 	flag.Parse()
 
 	// set up the log file path
-	cuttletarget_dir := fmt.Sprintf("%v-cuttlefish-enum", *target)
+	cuttletarget_dir := fmt.Sprintf("%v-cuttlefish-enum-%v", *target, scan_start)
 	logfile_root_path = filepath.Join(*output_path, cuttletarget_dir)
 	logfile_name := fmt.Sprintf("%v-cuttlemain-%v-.cuttlelog", *target, scan_start)
 	logfile_path = filepath.Join(logfile_root_path, logfile_name)
 
-	// create the file directory if we are logging ::TODO::
+	// create the file directory if we are logging
 	if logging {
 		err := os.MkdirAll(logfile_root_path, os.ModePerm)
 		if err != nil {
@@ -474,7 +494,7 @@ func main() {
 	}
 	// runmode summary
 	opt_1 := fmt.Sprintf("[*] run options")
-	logfile_path_string := fmt.Sprintf("\t[*] logging to %v", logfile_path)
+	logfile_path_string := fmt.Sprintf("\t[*] logging to %v", logfile_root_path)
 	opt_2 := fmt.Sprintf("\t[*] target %v", *target)
 	opt_3 := fmt.Sprintf("\t[*] aws tentacles %v", *tentacles)
 	colorPrint(opt_1, string_format.blue, logging, true)
@@ -484,24 +504,28 @@ func main() {
 	regularPrint(opt_2, logging, true)
 	regularPrint(opt_3, logging, true)
 	
-	// initialized the scans
+	// initialize the scans
 	var scans []scan
-	// nmap -vv -Pn -A -sC -sS -T 4 -p- TARGET
-	nmap_scan := scan{&sync.RWMutex{}, "initial nmap recon", "nmap", []string{}, "", "initialized", 0, false}
+	nmap_tcp_scan := scan{&sync.RWMutex{}, "initial nmap TCP recon", "nmap", []string{}, "", "initialized", 0, false}
+	nmap_udp_scan := scan{&sync.RWMutex{}, "initial nmap UDP recon", "nmap", []string{}, "", "initialized", 0, false}
+	spoof_scan := scan{&sync.RWMutex{}, "spoof scan", "sleep", []string{"1"}, "", "initialized", 0, false}
 	if os.Getuid() == 0 {
 		getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v), script scanning with nmap", os.Getuid())
 		colorPrint(getuid_string, string_format.green, logging, true)
-		nmap_scan.args = []string{"-vv", "-Pn", "-A", "-sC", "-sS", "-T4", "-p-", *target}
+		nmap_tcp_scan.args = []string{"-vv", "-Pn", "-A", "-sC", "-sS", "-p-", *target}
+		nmap_udp_scan.args = []string{"-vv", "-Pn", "-A", "-sC", "-sU", "--top-ports", "200"}
+		scans = append(scans, nmap_tcp_scan)
+		scans = append(scans, nmap_udp_scan)
+		scans = append(scans, spoof_scan)
 	} else {
 		getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), script scanning not performed", os.Getuid())
 		colorPrint(getuid_string, string_format.yellow, logging, true)
-		// "-vv", "-Pn", "-A", "-sS", "-T4", "-p-", 
-		//nmap_scan.args = []string{"-vv", "-Pn", "-A", "-T4", "-p-", *target}
-		nmap_scan.args = []string{*target}
+		//nmap_tcp_scan.args = []string{"-vv", "-Pn", "-A", "-p-", *target}
+		nmap_tcp_scan.args = []string{*target}
+		// don't bother with UDP since we can't w/o root
+		scans = append(scans, nmap_tcp_scan)
+		scans = append(scans, spoof_scan)
 	}
-	spoof_scan := scan{&sync.RWMutex{}, "spoof scan", "sleep", []string{"1"}, "", "initialized", 0, false}
-	scans = append(scans, nmap_scan)
-	scans = append(scans, spoof_scan)
 
 	// setup the scan channel
 	recon_scan_channel := make(chan bool)
@@ -516,7 +540,10 @@ func main() {
 	<-recon_scan_channel
 	
 	// now let's find services from the recon scan results
-	identified_services := identifyServices(scans[0].results)
+	identified_tcp_services := identifyServices(scans[0].results)
+	identified_udp_services := identifyServices(scans[1].results)
+	identified_services := append(identified_tcp_services, identified_udp_services...)
+	identified_services = removeDuplicateServices(identified_services)
 	if len(identified_services) == 0 {
 		colorPrint("[-] no services identified", string_format.red, logging, true)
 		colorPrint("\t[!] try different scan options", string_format.yellow, logging, true)
