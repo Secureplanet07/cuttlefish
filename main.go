@@ -58,6 +58,7 @@ type scan struct {
 	results string
 	status string
 	elapsed float64
+	logged bool
 }
 
 // struct to hold information about an id'd service
@@ -261,11 +262,18 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 			time_elapsed := current_time.Sub(start_time).Seconds()
 			if scans[i].status == "complete" || scans[i].status == "error" {
 				completion_statuses = append(completion_statuses, 1)
-				if logging {
+				// gross..but prevents a logging:false, logged=true loop write
+				if logging && scans[i].logged == false {
 					// write our actual scan loot outputs to a log file
-					scan_logfile_name := fmt.Sprintf("%v-%v-%v-.cuttlelog", target, scans[i].name, scan_start)
+					scan_logfile_name := fmt.Sprintf("%v-%v-%v-.cuttlelog", target, scans[i].command, scan_start)
 					scan_logfile_path := filepath.Join(logfile_root_path, scan_logfile_name)
-					log(scan_logfile_path, scans[i].results)
+					// log the error message if we error out
+					if scans[i].status == "error" {
+						log(scan_logfile_path, scans[i].name)
+					} else {
+						log(scan_logfile_path, scans[i].results)
+					}
+					
 					
 					// log the finishes to main log file
 					complete_char := "+"
@@ -274,6 +282,7 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 					}
 					to_write := fmt.Sprintf("\t[%v] scan: %v (%v) [time elapsed: %.2fs]", complete_char, scans[i].name, scans[i].status, scans[i].elapsed)
 					log(logfile_path, to_write)
+					scans[i].logged = true
 				}
 			} else {
 				scans[i].elapsed = time_elapsed
@@ -392,11 +401,11 @@ func makeServiceScanList(target string, service_list []service) []scan {
 			user_wordlist := "~/Documents/tools/SecLists/Usernames/top_shortlist.txt"
 			user_passlist := "~/Documents/tools/SecLists/Passwords/best1050.txt"
 			hydra_args := []string{"-L", user_wordlist, "-P", user_passlist, "-f", "-u", target, "-s", current_service.port, "ssh"}
-			new_scan := scan{&sync.RWMutex{}, "ssh hydra brute", "hydra", hydra_args, "", "initialized", 0}
+			new_scan := scan{&sync.RWMutex{}, "ssh hydra brute", "hydra", hydra_args, "", "initialized", 0, false}
 			service_scan_list = append(service_scan_list, new_scan)
 		} else if current_service.name == "http" {
 			gobuster_args := []string{}
-			new_scan := scan{&sync.RWMutex{}, "gobuster enumeration", "gobuster", gobuster_args, "", "initialized", 0}
+			new_scan := scan{&sync.RWMutex{}, "gobuster enumeration", "gobuster", gobuster_args, "", "initialized", 0, false}
 			service_scan_list = append(service_scan_list, new_scan)
 		}
 	}
@@ -404,7 +413,7 @@ func makeServiceScanList(target string, service_list []service) []scan {
 }
 
 func main() {
-	//
+	// get her started
 	// sig-term handler
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -465,7 +474,7 @@ func main() {
 	// initialized the scans
 	var scans []scan
 	// nmap -vv -Pn -A -sC -sS -T 4 -p- TARGET
-	nmap_scan := scan{&sync.RWMutex{}, "initial nmap recon", "nmap", []string{}, "", "initialized", 0}
+	nmap_scan := scan{&sync.RWMutex{}, "initial nmap recon", "nmap", []string{}, "", "initialized", 0, false}
 	if os.Getuid() == 0 {
 		getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v), script scanning with nmap", os.Getuid())
 		colorPrint(getuid_string, string_format.green, logging, true)
@@ -477,7 +486,7 @@ func main() {
 		//nmap_scan.args = []string{"-vv", "-Pn", "-A", "-T4", "-p-", *target}
 		nmap_scan.args = []string{*target}
 	}
-	spoof_scan := scan{&sync.RWMutex{}, "spoof scan", "sleep", []string{"1"}, "", "initialized", 0}
+	spoof_scan := scan{&sync.RWMutex{}, "spoof scan", "sleep", []string{"1"}, "", "initialized", 0, false}
 	scans = append(scans, nmap_scan)
 	scans = append(scans, spoof_scan)
 
