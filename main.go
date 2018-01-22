@@ -508,7 +508,6 @@ func main() {
 	var scans []scan
 	nmap_tcp_scan := scan{&sync.RWMutex{}, "initial nmap TCP recon", "nmap", []string{}, "", "initialized", 0, false}
 	nmap_udp_scan := scan{&sync.RWMutex{}, "initial nmap UDP recon", "nmap", []string{}, "", "initialized", 0, false}
-	spoof_scan := scan{&sync.RWMutex{}, "user scan", "whoami", []string{}, "", "initialized", 0, false}
 	if os.Getuid() == 0 {
 		getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v), script scanning with nmap", os.Getuid())
 		colorPrint(getuid_string, string_format.green, logging, true)
@@ -516,7 +515,6 @@ func main() {
 		nmap_udp_scan.args = []string{"-vv", "-Pn", "-A", "-sC", "-sU", "--top-ports", "200"}
 		scans = append(scans, nmap_tcp_scan)
 		scans = append(scans, nmap_udp_scan)
-		scans = append(scans, spoof_scan)
 	} else {
 		getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), script scanning not performed", os.Getuid())
 		colorPrint(getuid_string, string_format.yellow, logging, true)
@@ -524,7 +522,6 @@ func main() {
 		nmap_tcp_scan.args = []string{*target}
 		// don't bother with UDP since we can't w/o root
 		scans = append(scans, nmap_tcp_scan)
-		scans = append(scans, spoof_scan)
 	}
 
 	// setup the scan channel
@@ -540,10 +537,12 @@ func main() {
 	<-recon_scan_channel
 	
 	// now let's find services from the recon scan results
-	identified_tcp_services := identifyServices(scans[0].results)
-	identified_udp_services := identifyServices(scans[1].results)
-	identified_services := append(identified_tcp_services, identified_udp_services...)
-	identified_services = removeDuplicateServices(identified_services)
+	identified_services := identifyServices(scans[0].results)
+	if os.Getuid() == 0 {
+		identified_udp_services := identifyServices(scans[1].results)
+		identified_services := append(identified_services, identified_udp_services...)
+		identified_services = removeDuplicateServices(identified_services)
+	}
 	if len(identified_services) == 0 {
 		colorPrint("[-] no services identified", string_format.red, logging, true)
 		colorPrint("\t[!] try different scan options", string_format.yellow, logging, true)
@@ -551,20 +550,21 @@ func main() {
 	}
 	colorPrint("[+] identified running services", string_format.blue, logging, true)
 	for i := 0; i < len(identified_services); i++ {
-		service_string := fmt.Sprintf("\t[+] %v (%v)", 
+		if identified_services[i].status == "open" {
+			service_string := fmt.Sprintf("\t[+] %v (%v)", 
 			identified_services[i].name,
 			identified_services[i].port)
-		if identified_services[i].status == "open" {
 			colorPrint(service_string, string_format.green, logging, true)
 		} else {
+			service_string := fmt.Sprintf("\t[-] %v (%v)", 
+			identified_services[i].name,
+			identified_services[i].port)
 			colorPrint(service_string, string_format.red, logging, true)
 		}
 	}
 	colorPrint("[*] starting follow up scans on identified services", string_format.blue, logging, true)
 	// start new scans based on the service info
 	scans = makeServiceScanList(*target, identified_services)
-	// TESTING: add spoof scan
-	scans = append(scans, spoof_scan)
 	service_scan_channel := make(chan bool)
 	for i := 0; i < len(scans); i++ {
 		go performScan(*target, &scans[i])
