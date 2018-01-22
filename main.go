@@ -30,6 +30,8 @@ import (
 */
 // start time (for log files)
 var scan_start = time.Now()
+var term_width, _ = terminal.Width()
+var term_height, _ = terminal.Height()
 
 var status_spin = []string{"\\","|","/","-"}
 
@@ -84,6 +86,71 @@ var string_format = struct {
 	end: 	"\033[0m",
 	bold: 	"\033[1m",
 	underl: "\033[4m",
+}
+
+func cleanup() {
+	colorPrint("\n[!] caught Ctl-C ... cleaning up", string_format.yellow, logging, true)
+	os.Exit(1)
+}
+
+func allSame(ints []int) bool {
+	for i := 0; i < len(ints); i++ {
+		if ints[i] != ints[0] {
+			return false
+		}
+	}
+	return true
+}
+
+func log(log_filepath string, message string) {
+	if logging {
+		var f *os.File
+		var err error
+		// path to logfile doesn't exist, create the file
+		if _, err := os.Stat(log_filepath); os.IsNotExist(err) {
+			f, err = os.Create(log_filepath)
+			f.Close()
+		}
+		defer f.Close()
+		if err != nil {
+			error_mes := fmt.Sprintf("[-] cannot create log file\n\t%v\n", err)
+			colorPrint(error_mes, string_format.red, false, true)
+			os.Exit(1)
+		}
+		f, err = os.OpenFile(log_filepath, os.O_APPEND|os.O_WRONLY, 0600)
+		if err != nil {
+			error_mes := fmt.Sprintf("[-] cannot open log file\n\t%v\n", err)
+			colorPrint(error_mes, string_format.red, false, true)
+			os.Exit(1)
+		}
+		to_write := fmt.Sprintf("%v\n", message)
+		num, err := f.WriteString(to_write)
+		if err != nil && num > 0 {
+			error_mes := fmt.Sprintf("[-] cannot write to log file\n\t%v\n", err)
+			colorPrint(error_mes, string_format.red, false, true)
+			os.Exit(1)
+		}
+	}
+}
+
+func regularPrint(print_string string, logging bool, tracking bool) {
+	if logging {
+		log(logfile_path, print_string)
+	}
+	if tracking {
+		number_of_prints += 1
+	}
+	fmt.Printf("%v\n", print_string)
+}
+
+func colorPrint(print_string string, color string, logging bool, tracking bool) {
+	if logging {
+		log(logfile_path, print_string)
+	}
+	if tracking {
+		number_of_prints += 1
+	}
+	fmt.Printf("%v%v%v\n", color, print_string, string_format.end)
 }
 
 // getCreds()
@@ -152,10 +219,13 @@ func performScan(target string, scan_to_perform *scan) {
 	scan_to_perform.mutex.RUnlock()
 	out, err := exec.Command(scan_to_perform.command, scan_to_perform.args...).Output()
 	if err != nil {
-		error_string := fmt.Sprintf("[!] error running (%v)\n\t%v", 
+		error_string := fmt.Sprintf("[!] error running (%v)", 
+			scan_to_perform.command)
+		error_log_string := fmt.Sprintf("[!] error running (%v)\n\t%v", 
 			scan_to_perform.command, err)
-		colorPrint(error_string, string_format.red, logging, true)
-		os.Exit(1)
+		log(logfile_path, error_string)
+		scan_to_perform.status = "error"
+		scan_to_perform.name = error_string
 	}
 	scan_to_perform.mutex.RLock()
 	scan_to_perform.results = string(out)
@@ -173,9 +243,7 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 			log(logfile_path, to_write)
 		}
 	}
-
 	iteration := 0
-	
 	for 1 > finished {
 		iteration += 1
 		var completion_statuses []int
@@ -185,6 +253,16 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 			time_elapsed := current_time.Sub(start_time).Seconds()
 			if scans[i].status == "complete" {
 				completion_statuses = append(completion_statuses, 1)
+				if logging {
+					// write our actual scan loot outputs to a log file
+					scan_logfile_name := fmt.Sprintf("%v-%v-%v-.cuttlelog", target, scans[i].name, scan_start)
+					scan_logfile_path := filepath.Join(logfile_root_path, scan_logfile_name)
+					log(scan_logfile_path, scans[i].results)
+					
+					// log the finishes to main log file
+					to_write := fmt.Sprintf("\t[+] scan: %v (%v) [time elapsed: %.2fs]", scans[i].name, scans[i].status, scans[i].elapsed)
+					log(logfile_path, to_write)
+				}
 			} else {
 				scans[i].elapsed = time_elapsed
 				completion_statuses = append(completion_statuses, 0)
@@ -196,95 +274,16 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 
 		} else {
 			outputProgress(scans, iteration)
+			// without the sleep output gets nuts
+			time.Sleep(100000000)
 		}
 	}
-	// log the finishes
-	for i := 0; i < len(scans); i++ {
-		to_write := fmt.Sprintf("\t[+] scan: %v (%v) [time elapsed: %.2fs]", scans[i].name, scans[i].status, scans[i].elapsed)
-		if logging {
-			log(logfile_path, to_write)
-		}
-	}
-	// write our actual scan loot outputs to a log file
-	for i := 0; i < len(scans); i++ {
-		scan_logfile_name := fmt.Sprintf("%v-%v-%v-.cuttlelog", target, scans[i].name, scan_start)
-		scan_logfile_path := filepath.Join(logfile_root_path, scan_logfile_name)
-		log(scan_logfile_path, scans[0].results)
-	}
-	
 	// update tracked prints for number of scans
 	number_of_prints += len(scans)
 	scan_channel <- true
 }
 
-func allSame(ints []int) bool {
-	for i := 0; i < len(ints); i++ {
-		if ints[i] != ints[0] {
-			return false
-		}
-	}
-	return true
-}
-
-func log(log_filepath string, message string) {
-	if logging {
-		var f *os.File
-		var err error
-		// path to logfile doesn't exist, create the file
-		if _, err := os.Stat(log_filepath); os.IsNotExist(err) {
-			f, err = os.Create(log_filepath)
-			f.Close()
-		}
-		defer f.Close()
-		if err != nil {
-			error_mes := fmt.Sprintf("[-] cannot create log file\n\t%v\n", err)
-			colorPrint(error_mes, string_format.red, false, true)
-			os.Exit(1)
-		}
-		f, err = os.OpenFile(log_filepath, os.O_APPEND|os.O_WRONLY, 0600)
-		if err != nil {
-			error_mes := fmt.Sprintf("[-] cannot open log file\n\t%v\n", err)
-			colorPrint(error_mes, string_format.red, false, true)
-			os.Exit(1)
-		}
-		to_write := fmt.Sprintf("%v\n", message)
-		num, err := f.WriteString(to_write)
-		if err != nil && num > 0 {
-			error_mes := fmt.Sprintf("[-] cannot write to log file\n\t%v\n", err)
-			colorPrint(error_mes, string_format.red, false, true)
-			os.Exit(1)
-		}
-	}
-}
-
-func regularPrint(print_string string, logging bool, tracking bool) {
-	if logging {
-		log(logfile_path, print_string)
-	}
-	if tracking {
-		number_of_prints += 1
-	}
-	fmt.Printf("%v\n", print_string)
-}
-
-func colorPrint(print_string string, color string, logging bool, tracking bool) {
-	if logging {
-		log(logfile_path, print_string)
-	}
-	if tracking {
-		number_of_prints += 1
-	}
-	fmt.Printf("%v%v%v\n", color, print_string, string_format.end)
-}
-
-func cleanup() {
-	colorPrint("\n[!] caught Ctl-C ... cleaning up", string_format.yellow, logging, true)
-	os.Exit(1)
-}
-
 func outputProgress(scans []scan, iteration int) {
-	x, _ := terminal.Width()
-	//y, _ := terminal.Height()
 
 	// this will buffer our output updating the scan results
 	// without overwriting previous command line output
@@ -292,13 +291,13 @@ func outputProgress(scans []scan, iteration int) {
 	fmt.Printf("\033[%v;0H", output_height)
 	// overwrite with blank lines 
 	for i := 0; i < len(scans); i++ {
-		blank_line := strings.Repeat(" ", int(x))
+		blank_line := strings.Repeat(" ", int(term_width))
 		fmt.Println(blank_line)
 	}
 	fmt.Printf("\033[%v;0H", output_height)
 	// overwrite with updated scan results
 	for i := 0; i < len(scans); i++ {
-		status_character_idx := int(math.Floor(float64(iteration)/100)) % len(status_spin)
+		status_character_idx := int(math.Floor(float64(iteration)/1)) % len(status_spin)
 		status_character := status_spin[status_character_idx]
 		if scans[i].status == "complete" {
 			status_character = "+"
@@ -357,8 +356,33 @@ func identifyServices(nmap_output string) []service {
 // TODO: transforms a list of services into a list of scans
 // converts services identified by nmap output into `scan` structs for
 // downstream processing.
-func makeServiceScanList([]service) []scan {
-	return []scan{}
+func makeServiceScanList(target string, service_list []service) []scan {
+	/*
+	services covered by reconscan.py:
+		-ssh
+		-smtp
+		-snmp
+		-domain
+		-ftp
+		-microsoft-ds
+		-ms-sql
+	*/
+	service_scan_list := []scan{}
+	for i := 0; i < len(service_list); i++ {
+		current_service := &service_list[i]
+		// set up scans for identified services
+		if current_service.name == "ssh" {
+			// -L wordlists/userlist -P wordlists/offsecpass -f -o results/%s_sshhydra.txt -u %s -s %s ssh
+			hydra_args := []string{"-L", "~/Documents/tools/SecLists/Usernames/top_shortlist.txt", "-f", "-u", target, "-s", current_service.port, "ssh"}
+			new_scan := scan{&sync.RWMutex{}, "ssh hydra brute", "hydra", hydra_args, "", "initialized", 0}
+			service_scan_list = append(service_scan_list, new_scan)
+		} else if current_service.name == "http" {
+			gobuster_args := []string{}
+			new_scan := scan{&sync.RWMutex{}, "gobuster enumeration", "gobuster", gobuster_args, "", "initialized", 0}
+			service_scan_list = append(service_scan_list, new_scan)
+		}
+	}
+	return service_scan_list
 }
 
 func main() {
@@ -390,13 +414,18 @@ func main() {
 
 	// clear the terminal
 	print("\033[H\033[2J")
-	// make sure we're running as root
-	regularPrint("[~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]", logging, true)
-	regularPrint("[~~~~~~~~~~~~\twelcome to cuttlefish\t~~~~~~~~~~~]", logging, true)
-	regularPrint("[~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]", logging, true)
+	// header strings
+	cuttle_header_1 := "-------------.__   ,+-.           ,+ ~.     ,-----------"
+	cuttle_header_2 := "           O  o `- o ,-`           `.o `._./            "
+	cuttle_header_3 := "o   O   o   o _O  o /   cuttlefish   \\ O  o    O   o   O"
+	cuttle_header_4 := "__o___O____,-`  `\\_*         v0.0     \\._____o___coastal"
+	regularPrint(cuttle_header_1, logging, true)
+	regularPrint(cuttle_header_2, logging, true)
+	regularPrint(cuttle_header_3, logging, true)
+	regularPrint(cuttle_header_4, logging, true)
 	// var aws_session *session.Session
 	if *target == "d34db33f" {
-		regularPrint("[!] specify a target with '-target=TARGET_IP'", logging, true)
+		colorPrint("[!] specify a target with '-target=TARGET_IP'", string_format.red, logging, true)
 		os.Exit(0)
 	}
 	if *tentacles > 0 {
@@ -404,18 +433,16 @@ func main() {
 		initializeAWSSession()	
 	}
 	// runmode summary
-	opt_1 := fmt.Sprintf("[~~~~~~~~~~~~~~~~~   run options   ~~~~~~~~~~~~~~~~]")
-	logfile_path_string := fmt.Sprintf("[*] logging to %v", logfile_path)
-	opt_2 := fmt.Sprintf("[*] target 				%v", *target)
-	opt_3 := fmt.Sprintf("[*] aws tentacles 				%v", *tentacles)
-	opt_4 := fmt.Sprintf("[*] enum modes: nmap")
-	regularPrint(opt_1, logging, true)
+	opt_1 := fmt.Sprintf("[*] run options")
+	logfile_path_string := fmt.Sprintf("\t[*] logging to %v", logfile_path)
+	opt_2 := fmt.Sprintf("\t[*] target %v", *target)
+	opt_3 := fmt.Sprintf("\t[*] aws tentacles %v", *tentacles)
+	colorPrint(opt_1, string_format.blue, logging, true)
 	if logging {
 		regularPrint(logfile_path_string, logging, true)
 	}
 	regularPrint(opt_2, logging, true)
 	regularPrint(opt_3, logging, true)
-	regularPrint(opt_4, logging, true)
 	
 	// initialized the scans
 	var scans []scan
@@ -440,6 +467,7 @@ func main() {
 	recon_scan_channel := make(chan bool)
 	
 	// pass by reference so we update the shared struct value
+	colorPrint("[*] starting intial nmap recon scan", string_format.blue,logging, true)
 	for i := 0; i < len(scans); i++ {
 		go performScan(*target, &scans[i])
 	}
@@ -465,18 +493,18 @@ func main() {
 			colorPrint(service_string, string_format.red, logging, true)
 		}
 	}
-
-	/* start new scans based on the service info
-	scans = makeServiceScanList(identified_services)
+	colorPrint("[*] starting follow up scans on identified services", string_format.blue, logging, true)
+	// start new scans based on the service info
+	scans = makeServiceScanList(*target, identified_services)
 	service_scan_channel := make(chan bool)
-	trackedPrint("[*] performing service scans")
 	for i := 0; i < len(scans); i++ {
 		go performScan(*target, &scans[i])
-	} 
+	}
+	go scanProgress(scans, *target, service_scan_channel)
+	<-service_scan_channel
 
 	complete_string := fmt.Sprintf("[+] cuttlefish scan of %v complete!\n", *target)
 	regularPrint(complete_string, logging, true)
-	//*/
 }
 
 

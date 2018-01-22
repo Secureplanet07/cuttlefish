@@ -114,17 +114,23 @@ func TestIdentifyServices2(t *testing.T) {
 	if len(identified) != len(nmap_output_2_results) {
 		t.Errorf("didn't identify all running services\n")
 	}
-	if identified[0].name != nmap_output_2_results[0][2] {
-		t.Errorf("%v",identified[0])
-		t.Errorf("issues with service name parsing (%v:%v)", identified[0].name, nmap_output_2_results[0][2])
-	}
-	/*
 	for i := 0; i < len(nmap_output_2_results); i ++ {
 		if identified[i].name != nmap_output_2_results[i][2] {
 			t.Errorf("issues with service name parsing (%v:%v)", identified[i].name, nmap_output_2_results[i][2])
 		}
-	} */
+	}
 }
+
+func TestMakeServiceScanList(t *testing.T) {
+	identified := identifyServices(nmap_output_2)
+	service_scan_list := makeServiceScanList("t3st1ng", identified)
+	if len(service_scan_list) < 24 {
+		t.Errorf("expected 24 services...identified %v", len(service_scan_list))
+	}
+}
+
+
+
 
 
 
