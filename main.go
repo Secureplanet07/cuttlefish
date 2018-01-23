@@ -476,13 +476,6 @@ func main() {
 	testing		:= flag.Bool("testing", false, "use test executables for enum output")
 	flag.Parse()
 
-	// if testing, set the os to use the CWD as an executable path
-	if *testing {
-		current_path := os.Getenv("PATH")
-		new_path := fmt.Sprintf("$(cwd):%v", current_path)
-		os.Setenv("PATH", new_path)
-	}
-
 	// set up the log file path
 	cuttletarget_dir := fmt.Sprintf("%v-cuttlefish-enum", *target)
 	logfile_root_path = filepath.Join(*output_path, cuttletarget_dir)
@@ -503,6 +496,7 @@ func main() {
 
 	// clear the terminal
 	print("\033[H\033[2J")
+
 	// header strings
 	cuttle_header_1 := "-------------.__   ,+-.           ,+ ~.     ,-----------"
 	cuttle_header_2 := "           O  o `- o ,-`           `.o `._./            "
@@ -512,6 +506,9 @@ func main() {
 	colorPrint(cuttle_header_2, string_format.blue,logging, true)
 	colorPrint(cuttle_header_3, string_format.blue,logging, true)
 	colorPrint(cuttle_header_4, string_format.blue,logging, true)
+	if *testing {
+		colorPrint("[*] running in test mode", string_format.yellow, logging, true)
+	}
 	// var aws_session *session.Session
 	if *target == "d34db33f" {
 		colorPrint("[!] specify a target with '-target=TARGET_IP'", string_format.red, logging, true)
@@ -532,6 +529,29 @@ func main() {
 	}
 	regularPrint(opt_2, logging, true)
 	regularPrint(opt_3, logging, true)
+
+	// if testing, set the os to use the CWD as an executable path
+	if *testing {		
+		current_path := os.Getenv("PATH")
+		current_location,_ := filepath.Abs(filepath.Dir(os.Args[0]))
+		if !strings.Contains(current_path, current_location) {
+			colorPrint("[!] testing requires preceeding PATH with the cuttlefish dir", string_format.red, logging, true)
+			colorPrint("\t[*] alter the PATH variable so that cuttlefish dir has priority", string_format.red, logging, true)
+			colorPrint("\t[*] command: `export PATH=$(pwd):$PATH`", string_format.red, logging, true)
+			os.Exit(0)
+		}
+	} else {
+		// remove the cuttlefish dir from path to avoid taking precedence over
+		// the real binaries
+		current_path := os.Getenv("PATH")
+		current_location,_ := filepath.Abs(filepath.Dir(os.Args[0]))
+		if strings.Contains(current_path, current_location) {
+			colorPrint("[!] fix PATH to remove cuttlefish dir", string_format.red, logging, true)
+			regularPrint("\t[*] command 1: `echo $PATH`", logging, true)
+			regularPrint("\t[*] command 2: `export PATH=<copy paste of PATH without cwd>`", logging, true)
+			os.Exit(0)
+		}
+	}
 	
 	// initialize the scans
 	var scans []scan
@@ -610,6 +630,10 @@ func main() {
 	complete_string := fmt.Sprintf("[+] cuttlefish enumeration of %v complete!\n", *target)
 	regularPrint(complete_string, logging, true)
 }
+
+
+
+
 
 
 
