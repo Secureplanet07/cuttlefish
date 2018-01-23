@@ -581,13 +581,11 @@ func main() {
 	opt_1 := fmt.Sprintf("[*] run options")
 	logfile_path_string := fmt.Sprintf("\t[*] logging to %v", logfile_root_path)
 	opt_2 := fmt.Sprintf("\t[*] target:\t\t%v", *target)
-	opt_3 := fmt.Sprintf("\t[*] aws tentacles:\t%v", *tentacles)
 	regularPrint(opt_1, logging, true)
 	if logging {
 		regularPrint(logfile_path_string, logging, true)
 	}
 	regularPrint(opt_2, logging, true)
-	regularPrint(opt_3, logging, true)
 
 	// if testing, set the os to use the CWD as an executable path
 	if *testing {		
