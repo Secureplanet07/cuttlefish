@@ -1,6 +1,6 @@
 #!/bin/bash
 
-install_dir = "$(pwd)"
+INSTALLDIR=`pwd`
 
 # install golang if not present
 echo "[*] checking if golang is installed"
@@ -11,12 +11,11 @@ then
 	curl -O 'https://dl.google.com/go/go1.9.3.linux-amd64.tar.gz'
 	sudo tar -C /usr/local -xzf ~/Downloads/go1.9.3.linux-amd64.tar.gz
 	export PATH="$PATH:/usr/local/go/bin"
-	cd $install_dir
 fi
 echo "[+] golang is installed!"
-
+cd $INSTALLDIR
 echo "[*] changing gopath to current dir"
-export GOPATH="$(pwd)"
+export GOPATH=$INSTALLDIR
 echo "[*] installing go dependencies"
 go get -u github.com/wayneashleyberry/terminal-dimensions
 echo "[*] compiling project"
