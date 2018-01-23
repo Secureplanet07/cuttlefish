@@ -2,6 +2,16 @@
 
 **cuttlefish** has morphed from my original intention of a host-distributed webapp enumeration tool, into an automated scanning tool for single-host penetration testing. I am going to enroll in OffSec's PWK to prepare for taking the OSCP, and want to have a tool that will help me perform automated host enumeration. Additionally, I wanted to learn `go` from a practical project PoV.
 
+### installation
+
+An automated install script has been setup for linux (only tested on 64-bit Kali)
+
+```
+./linux_install.sh
+```
+
+If you would like to install on a mac, install `go`, and perform the steps from the install script (post golang-installation) one at a time.
+
 ### example enumeration
 
 ```
@@ -93,4 +103,57 @@ $tree ~/Downloads/192.168.56.3-cuttlefish-enum
 ├── 192.168.56.3-smtp-nmap-enum-[port:25]-2018-01-23-[truncated].cuttlelog
 └── 192.168.56.3-smtp-user-enum-[port:25]-2018-01-23-[truncated].cuttlelog
 
+```
+
+### example logfile contents
+
+```
+cat '192.168.56.3-http-nmap-scan-[port:8180]-2018-01-23 17:42:36.171148434 -0500 EST m=+0.000271201-.cuttlelog'
+
+Starting Nmap 7.60 ( https://nmap.org ) at 2018-01-23 17:45 EST
+Nmap scan report for 192.168.56.3
+Host is up (0.0084s latency).
+
+PORT     STATE SERVICE VERSION
+8180/tcp open  http    Apache Tomcat/Coyote JSP engine 1.1
+| http-default-accounts: 
+|   [Apache Tomcat] at /manager/html/
+|_    tomcat:tomcat
+|_http-devframework: Couldn't determine the underlying framework or CMS. Try increasing 'httpspider.maxpagecount' value to spider more pages.
+| http-enum: 
+|   /admin/: Possible admin folder
+|   /admin/index.html: Possible admin folder
+|   /admin/login.html: Possible admin folder
+|   /admin/admin.html: Possible admin folder
+|   /admin/account.html: Possible admin folder
+|   /admin/admin_login.html: Possible admin folder
+|   /admin/home.html: Possible admin folder
+|   /admin/admin-login.html: Possible admin folder
+|   /admin/adminLogin.html: Possible admin folder
+|   /admin/controlpanel.html: Possible admin folder
+|   /admin/cp.html: Possible admin folder
+|   /admin/index.jsp: Possible admin folder
+|   /admin/login.jsp: Possible admin folder
+|   /admin/admin.jsp: Possible admin folder
+|   /admin/home.jsp: Possible admin folder
+|   /admin/controlpanel.jsp: Possible admin folder
+|   /admin/admin-login.jsp: Possible admin folder
+|   /admin/cp.jsp: Possible admin folder
+|   /admin/account.jsp: Possible admin folder
+|   /admin/admin_login.jsp: Possible admin folder
+|   /admin/adminLogin.jsp: Possible admin folder
+|   /manager/html/upload: Apache Tomcat (401 Unauthorized)
+|   /manager/html: Apache Tomcat (401 Unauthorized)
+|   /admin/view/javascript/fckeditor/editor/filemanager/connectors/test.html: OpenCart/FCKeditor File upload
+|   /admin/includes/FCKeditor/editor/filemanager/upload/test.html: ASP Simple Blog / FCKeditor File Upload
+|   /admin/jscript/upload.html: Lizard Cart/Remote File upload
+|_  /webdav/: Potentially interesting folder
+| http-methods: 
+|_  Supported Methods: GET HEAD POST OPTIONS
+|_http-server-header: Apache-Coyote/1.1
+| http-vhosts: 
+|_127 names had status 200
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 42.27 seconds
 ```
