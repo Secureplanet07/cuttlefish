@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 	"fmt"
-	//"net"
+	"net"
 	"flag"
 	"math"
 	"sync"
@@ -457,7 +457,7 @@ func SMTPEnum(target string, scan_to_run *scan, return_channel chan bool) {
 	results_buffer.WriteString("[*] wordlist exists\n")
 	f, o_err := os.OpenFile(smtp_default_namelist, os.O_APPEND|os.O_WRONLY, 0600)
 	if o_err != nil {
-		error_mes := fmt.Sprintf("[!] error: cannot open SMTP namelist file: %v\n", o_err)
+		error_mes := fmt.Sprintf("[!] error: cannot open SMTP namelist file: %v:\n", o_err)
 		results_buffer.WriteString(error_mes)
 		scan_to_run.results = string(results_buffer.Bytes())
 		scan_to_run.status = "error"
@@ -467,9 +467,10 @@ func SMTPEnum(target string, scan_to_run *scan, return_channel chan bool) {
 	// read the file and split the lines into names to brute force
 	//		TODO
 	//
-	ip_addr, ip_err := net.ResolveTCPAddr("tcp4", target)
+	net_addr := fmt.Sprintf("%v:%v", target, scan_to_run.args[0])
+	ip_addr, ip_err := net.ResolveTCPAddr("tcp4", net_addr)
 	if ip_err != nil {
-		error_mes := fmt.Sprintf("[!] error: could not resolve IP address %v", target)
+		error_mes := fmt.Sprintf("[!] error: could not resolve IP address (%v): %v\n", net_addr, ip_err)
 		results_buffer.WriteString(error_mes)
 		scan_to_run.results = string(results_buffer.Bytes())
 		scan_to_run.status = "error"
@@ -477,20 +478,30 @@ func SMTPEnum(target string, scan_to_run *scan, return_channel chan bool) {
 	}
 	conn, c_err := net.DialTCP("tcp", nil, ip_addr)
 	if c_err != nil {
-		error_mes := "[!] error: could not connect to target"
+		error_mes := fmt.Sprintf("[!] error: could not connect to target (%v): %v\n", net_addr, c_err)
 		results_buffer.WriteString(error_mes)
 		scan_to_run.results = string(results_buffer.Bytes())
 		scan_to_run.status = "error"
 		return_channel <- true
 	}
-	_, w_err = conn.Write([]byte("root"))
-	result, w_err := ioutil.ReadAll(conn)
+	_, w_err := conn.Write([]byte("root"))
 	if w_err != nil {
-		error_mes := "[-] could not write to target"
+		error_mes := fmt.Sprintf("[-] could not write to target (%v): %v\n", net_addr, w_err)
 		results_buffer.WriteString(error_mes)
-		return_channel <- results_buffer.String()
+		scan_to_run.results = string(results_buffer.Bytes())
+		scan_to_run.status = "error"
+		return_channel <- true
 	}
-	//*/
+	/*result, w_err := ioutil.ReadAll(conn)
+	_, r_err := ioutil.ReadAll(conn)
+	if r_err != nil {
+		error_mes := "[-] could not read from target"
+		results_buffer.WriteString(error_mes)
+		scan_to_run.results = string(results_buffer.Bytes())
+		scan_to_run.status = "error"
+		return_channel <- true
+	} //*/
+
 	results_buffer.WriteString("this is dummy smtp scan output")
 	scan_to_run.results = string(results_buffer.Bytes())
 	return_channel <- true 
@@ -520,7 +531,7 @@ func makeServiceScanList(target string, service_list []service) []scan {
 			new_scan := scan{&sync.RWMutex{}, "os", "ssh hydra brute", "hydra", hydra_args, "", "initialized", 0, false, ""}
 			service_scan_list = append(service_scan_list, new_scan)
 		} else if current_service.name == "smtp" {
-			new_scan := scan{&sync.RWMutex{}, "cuttlefish", "smtp enum", "smtp", []string{}, "", "initialized", 0, false, ""}
+			new_scan := scan{&sync.RWMutex{}, "cuttlefish", "smtp enum", "smtp", []string{current_service.port}, "", "initialized", 0, false, ""}
 			service_scan_list = append(service_scan_list, new_scan)
 		} else if current_service.name == "http" || current_service.name == "ssl/http" ||
 			strings.Contains(current_service.name, "https") {
