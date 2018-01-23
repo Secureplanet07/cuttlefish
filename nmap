@@ -1,7 +1,7 @@
 #!/bin/bash
 
 sleep 0
-echo "Nmap scan report for 192.168.56.3
+echo 'Nmap scan report for 192.168.56.3
 Host is up (0.0074s latency).
 Not shown: 976 filtered ports
 PORT     STATE  SERVICE
@@ -28,4 +28,4 @@ PORT     STATE  SERVICE
 6000/tcp open   X11
 6667/tcp open   irc
 8009/tcp open   ajp13
-8180/tcp open   unknown"
+8180/tcp open   unknown'

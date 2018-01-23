@@ -424,7 +424,7 @@ func makeServiceScanList(target string, service_list []service) []scan {
 	/*
 	services covered by reconscan.py:
 		[x] ssh
-		[ ] smtp
+		[x] smtp
 		[ ] snmp
 		[ ] domain
 		[ ] ftp
@@ -441,7 +441,7 @@ func makeServiceScanList(target string, service_list []service) []scan {
 			new_scan := scan{&sync.RWMutex{}, "os", "ssh hydra brute", "hydra", hydra_args, "", "initialized", 0, false, ""}
 			service_scan_list = append(service_scan_list, new_scan)
 		} else if current_service.name == "smtp" {
-			new_scan := scan{&sync.RWMutex{}, "os", "smtp enum", "smtp-user-enum.pl", []string{"-U", smtp_default_namelist, "-t", target}, "", "initialized", 0, false, ""}
+			new_scan := scan{&sync.RWMutex{}, "os", "smtp enum", "smtp-user-enum.pl", []string{"-U", smtp_default_namelist, "-t", target, "-p", current_service.port}, "", "initialized", 0, false, ""}
 			service_scan_list = append(service_scan_list, new_scan)
 		} else if current_service.name == "http" || current_service.name == "ssl/http" ||
 			strings.Contains(current_service.name, "https") {
