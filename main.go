@@ -443,8 +443,8 @@ func makeServiceScanList(target string, service_list []service) []scan {
 		[ ] domain
 		[x] ftp
 		[x] http/s
-		[ ] microsoft-ds
-		[ ] ms-sql
+		[x] microsoft-ds
+		[x] ms-sql
 	*/
 	service_scan_list := []scan{}
 	for i := 0; i < len(service_list); i++ {
@@ -475,12 +475,35 @@ func makeServiceScanList(target string, service_list []service) []scan {
 			url_target := fmt.Sprintf("http://%v", target)
 			if strings.Contains(current_service.name, "https") {
 				url_target = fmt.Sprintf("https://%v", target)
+				// add sslscan scan
+				sslscan_arg := fmt.Sprintf("%v:%v", url_target, current_service.port)
+				sslscan_scan := scan{&sync.RWMutex{}, "os", "sslscan-scan", "sslscan", []string{sslscan_arg}, "", "initialized", 0, false, ""}
+				service_scan_list = append(service_scan_list, sslscan_scan)
 			}
 			gobuster_args := []string{"-u", url_target, "-w", gobuster_default_dirlist}
 			gobuster_scan := scan{&sync.RWMutex{}, "os", "gobuster-dir-enum", "gobuster", gobuster_args, "", "initialized", 0, false, ""}
 			nikto_scan := scan{&sync.RWMutex{}, "os", "nikto-scan", "nikto", []string{"-h", url_target}, "", "initialized", 0, false, ""}
+			http_nmap_scan_args := []string{"-sV", "-Pn", "vv", "-p", current_service.port, "--script=http-vhosts,http-userdir-enum,http-apache-negotiation,http-backup-finder,http-config-backup,http-default-accounts,http-methods,http-method-tamper,http-passwd,http-robots.txt,http-devframework,http-enum,http-frontpage-login,http-git,http-iis-webdav-vuln,http-php-version,http-robots.txt,http-shellshock,http-vuln-cve2015-1635", target}
+			http_nmap_scan := scan{&sync.RWMutex{}, "os", "http-nmap-scan", "nmap", http_nmap_scan_args, "", "initialized", 0, false, ""}
+			http_curl_scan_args := []string{"-I", url_target}
+			http_curl_scan := scan{&sync.RWMutex{}, "os", "http-curl-scan", "curl", http_curl_scan_args, "", "initialized", 0, false, ""}
 			service_scan_list = append(service_scan_list, gobuster_scan)
 			service_scan_list = append(service_scan_list, nikto_scan)
+			service_scan_list = append(service_scan_list, http_nmap_scan)
+			service_scan_list = append(service_scan_list, http_curl_scan)
+		} else if current_service.name == "microsoft-ds" {
+			smb_nmap_scan_args := []string{"-p", current_service.port, "--script=smb-enum-shares.nse,smb-ls.nse,smb-enum-users.nse,smb-mbenum.nse,smb-os-discovery.nse,smb-security-mode.nse,smbv2-enabled.nse,smb-vuln-cve2009-3103.nse,smb-vuln-ms06-025.nse,smb-vuln-ms07-029.nse,smb-vuln-ms08-067.nse,smb-vuln-ms10-054.nse,smb-vuln-ms10-061.nse,smb-vuln-regsvc-dos.nse,smbv2-enabled.nse", target}
+			smb_nmap_scan := scan{&sync.RWMutex{}, "os", "smb-nmap-scan", "nmap", smb_nmap_scan_args, "", "initialized", 0, false, ""}
+			smb_enumlinux_scan_args := []string{"-a", target}
+			smb_enumlinux_scan := scan{&sync.RWMutex{}, "os", "smb-enumlinux-scan", "enum4linux", smb_enumlinux_scan_args, "", "initialized", 0, false, ""}
+			service_scan_list = append(service_scan_list, smb_nmap_scan)
+			service_scan_list = append(service_scan_list, smb_enumlinux_scan)
+		} else if current_service.name == "ms-sql" {
+			// nmap -sV -Pn -p %s --script=ms-sql-info,ms-sql-config,ms-sql-dump-hashes --script-args=mssql.instance-port=1433,smsql.username-sa,mssql.password-sa
+			mssql_nmap_script_args := fmt.Sprintf("--script-args=mssql.instance-port=%v,smsql.username-sa,mssql.password-sa", current_service.port)
+			mssql_nmap_scan_args := []string{"-sV", "-Pn", "-p", current_service.port, "--script=ms-sql-info,ms-sql-config,ms-sql-dump-hashes", mssql_nmap_script_args, target}
+			mssql_nmap_scan := scan{&sync.RWMutex{}, "os", "mssql-nmap-scan", "nmap", mssql_nmap_scan_args, "", "initialized", 0, false, ""}
+			service_scan_list = append(service_scan_list, mssql_nmap_scan)
 		}
 	}
 	return service_scan_list
