@@ -42,11 +42,11 @@ var script_dir = filepath.Join(working_dir, "scripts")
 var number_of_prints = 0
 
 // arguments to scans
-var hydra_default_user_wordlist = 	"/Users/coastal/Documents/tools/SecLists/Usernames/top_shortlist.txt"
-var hydra_default_user_passlist = 	"/Users/coastal/Documents/tools/SecLists/Passwords/best1050.txt"
-var gobuster_default_dirlist = 		"/Users/coastal/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
-var gobuster_default_filelist = 	"/Users/coastal/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt"
-var smtp_default_namelist = 		"/Users/coastal/Documents/tools/SecLists/Usernames/top_shortlist.txt"
+var hydra_default_user_wordlist = 	"/root/Documents/tools/SecLists/Usernames/top_shortlist.txt"
+var hydra_default_user_passlist = 	"/root/Documents/tools/SecLists/Passwords/best1050.txt"
+var gobuster_default_dirlist = 		"/root/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
+var gobuster_default_filelist = 	"/root/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt"
+var smtp_default_namelist = 		"/root/Documents/tools/SecLists/Usernames/top_shortlist.txt"
 
 // stuff to keep track of the prints so we can update the terminal ouput
 // properly when we print past the end of the terminal
