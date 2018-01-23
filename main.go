@@ -13,14 +13,8 @@ import (
 	"os/exec"
 	"os/user"
 	"os/signal"
-	"io/ioutil"
-	"encoding/json"
 	"path/filepath"
 	terminal "github.com/wayneashleyberry/terminal-dimensions"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	//"github.com/aws/aws-sdk-go/service/ec2"
 )
 
 /*
@@ -184,64 +178,6 @@ func colorPrint(print_string string, color string, logging bool, tracking bool) 
 		addToPreviousPrints(color, print_string)
 	}
 	fmt.Printf("%v%v%v\n", color, print_string, string_format.end)
-}
-
-// getCreds()
-//	pull aws creds from creds.json
-func getCreds() creds {
-	regularPrint("[*] loading aws credentials from ./creds.json", logging, true)
-	var aws_creds creds
-	rawjson, err := ioutil.ReadFile("./creds.json")
-	if err != nil {
-		print_string := fmt.Sprintf("\t[-] %v", err.Error())
-		regularPrint(print_string, logging, true)
-		os.Exit(1)
-	}
-	err = json.Unmarshal(rawjson, &aws_creds)
-	if err != nil {
-		print_string := fmt.Sprintf("\t[-] %v", err.Error())
-		regularPrint(print_string, logging, true)
-		os.Exit(1)
-	}
-	if len(aws_creds.AccessKey) == 0 || len(aws_creds.SecretKey) == 0 {
-		regularPrint("\t[-] keys not loaded successfully", logging, true)
-		os.Exit(1)
-	}
-	regularPrint("\t[+] creds loaded from file successfully", logging, true)
-	return aws_creds
-}
-
-// returns an authenticated AWS API session object to use
-// for spinning up EC2 instances
-func initializeAWSSession() *session.Session{
-	// load the creds
-	aws_creds := getCreds()
-	
-	regularPrint("[*] grabbing AWS session", logging, true)
-
-	// set environmental variables
-	akid_arg := []string{"AWS_ACCESS_KEY_ID", aws_creds.AccessKey}
-	secret_arg := []string{"AWS_SECRET_ACCESS_KEY", aws_creds.SecretKey}
-	env_sets := [][]string{akid_arg, secret_arg}
-	
-	for i := 0; i < len(env_sets); i++ {
-		os.Setenv(env_sets[i][0], env_sets[i][1])
-	}
-	// get a new aws session
-	creds := credentials.NewEnvCredentials()
-	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String("us-west-2"),
-		Credentials: creds,
-	})
-	// make sure we got an authenticated session
-	_, crederr := sess.Config.Credentials.Get()
-	if crederr != nil {
-		print_string := fmt.Sprintf("\t[-] invalid credentials %v", err.Error())
-		regularPrint(print_string, logging, true)
-		os.Exit(0)
-	}
-	regularPrint("\t[+] successfully authenticated AWS session", logging, true)
-	return sess
 }
 
 func scanProgress(scans []scan, target string, scan_channel chan bool) {
@@ -638,8 +574,8 @@ func main() {
 		os.Exit(0)
 	}
 	if *tentacles > 0 {
-		// aws_session := initializeAWSSession()
-		initializeAWSSession()	
+		colorPrint("[!] aws tentacles are not implemented", string_format.red, logging, true)
+		os.Exit(0)
 	}
 	// runmode summary
 	opt_1 := fmt.Sprintf("[*] run options")
