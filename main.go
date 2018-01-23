@@ -3,13 +3,10 @@ package main
 import (
 	"os"
 	"fmt"
-	"net"
 	"flag"
 	"math"
 	"sync"
 	"time"
-	"bytes"
-	"errors"
 	"regexp"
 	"strings"
 	"syscall"
@@ -406,26 +403,6 @@ func performScan(target string, scan_to_perform *scan) {
 		scan_to_perform.status = "error"
 		scan_to_perform.name = error_string
 		}
-	} else {
-		// if our scans are cuttlefish scans
-		// if our scan is an SMTP scan
-		if scan_to_perform.command == "smtp" {
-			scan_channel := make(chan bool)
-			go SMTPEnum(target, scan_to_perform, scan_channel)
-			<-scan_channel
-			out = []byte(scan_to_perform.results)
-			err = errors.New(scan_to_perform.results)
-		}
-		if scan_to_perform.status == "error" {
-			error_string := fmt.Sprintf("%v:check logs", 
-				scan_to_perform.command)
-			error_log_string := fmt.Sprintf("[!] error running (%v)\n\t%v", 
-				scan_to_perform.command, scan_to_perform.results)
-			if logging {
-				log(logfile_path, error_log_string)
-			}
-			scan_to_perform.name = error_string
-		}
 	}
 	
 	scan_to_perform.mutex.RLock()
@@ -438,73 +415,6 @@ func performScan(target string, scan_to_perform *scan) {
 
 func postScanProcessing(completed_scan scan) {
 	// TODO
-}
-
-func SMTPEnum(target string, scan_to_run *scan, return_channel chan bool) {
-	// TODO...this is all weird. the return channel is blocking past when
-	// the return bool is sent to it.
-
-	//
-	var results_buffer bytes.Buffer
-	// open the enum wordlist file
-	if _, e_err := os.Stat(smtp_default_namelist); os.IsNotExist(e_err) {
-		error_mes := fmt.Sprintf("[!] error: SMTP namelist file does not exist: %v\n", e_err)
-		results_buffer.WriteString(error_mes)
-		scan_to_run.results = string(results_buffer.Bytes())
-		scan_to_run.status = "error"
-		return_channel <- true
-	}
-	results_buffer.WriteString("[*] wordlist exists\n")
-	f, o_err := os.OpenFile(smtp_default_namelist, os.O_APPEND|os.O_WRONLY, 0600)
-	if o_err != nil {
-		error_mes := fmt.Sprintf("[!] error: cannot open SMTP namelist file: %v:\n", o_err)
-		results_buffer.WriteString(error_mes)
-		scan_to_run.results = string(results_buffer.Bytes())
-		scan_to_run.status = "error"
-		return_channel <- true
-	}
-	defer f.Close()
-	// read the file and split the lines into names to brute force
-	//		TODO
-	//
-	net_addr := fmt.Sprintf("%v:%v", target, scan_to_run.args[0])
-	ip_addr, ip_err := net.ResolveTCPAddr("tcp4", net_addr)
-	if ip_err != nil {
-		error_mes := fmt.Sprintf("[!] error: could not resolve IP address (%v): %v\n", net_addr, ip_err)
-		results_buffer.WriteString(error_mes)
-		scan_to_run.results = string(results_buffer.Bytes())
-		scan_to_run.status = "error"
-		return_channel <- true
-	}
-	conn, c_err := net.DialTCP("tcp", nil, ip_addr)
-	if c_err != nil {
-		error_mes := fmt.Sprintf("[!] error: could not connect to target (%v): %v\n", net_addr, c_err)
-		results_buffer.WriteString(error_mes)
-		scan_to_run.results = string(results_buffer.Bytes())
-		scan_to_run.status = "error"
-		return_channel <- true
-	}
-	_, w_err := conn.Write([]byte("root"))
-	if w_err != nil {
-		error_mes := fmt.Sprintf("[-] could not write to target (%v): %v\n", net_addr, w_err)
-		results_buffer.WriteString(error_mes)
-		scan_to_run.results = string(results_buffer.Bytes())
-		scan_to_run.status = "error"
-		return_channel <- true
-	}
-	/*result, w_err := ioutil.ReadAll(conn)
-	_, r_err := ioutil.ReadAll(conn)
-	if r_err != nil {
-		error_mes := "[-] could not read from target"
-		results_buffer.WriteString(error_mes)
-		scan_to_run.results = string(results_buffer.Bytes())
-		scan_to_run.status = "error"
-		return_channel <- true
-	} //*/
-
-	results_buffer.WriteString("this is dummy smtp scan output")
-	scan_to_run.results = string(results_buffer.Bytes())
-	return_channel <- true 
 }
 
 // TODO: transforms a list of services into a list of scans
@@ -531,7 +441,7 @@ func makeServiceScanList(target string, service_list []service) []scan {
 			new_scan := scan{&sync.RWMutex{}, "os", "ssh hydra brute", "hydra", hydra_args, "", "initialized", 0, false, ""}
 			service_scan_list = append(service_scan_list, new_scan)
 		} else if current_service.name == "smtp" {
-			new_scan := scan{&sync.RWMutex{}, "cuttlefish", "smtp enum", "smtp", []string{current_service.port}, "", "initialized", 0, false, ""}
+			new_scan := scan{&sync.RWMutex{}, "os", "smtp enum", "smtp-user-enum.pl", []string{"-U", smtp_default_namelist, "-t", target}, "", "initialized", 0, false, ""}
 			service_scan_list = append(service_scan_list, new_scan)
 		} else if current_service.name == "http" || current_service.name == "ssl/http" ||
 			strings.Contains(current_service.name, "https") {
