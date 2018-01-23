@@ -1,5 +1,5 @@
 #!/bin/bash
 
-sleep 7
+sleep 0
 echo 'hydra complete'
 
