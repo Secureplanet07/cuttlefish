@@ -720,12 +720,10 @@ func main() {
 	for i := 0; i < len(scans); i++ {
 		postScanProcessing(scans[i])
 	}
-
-	complete_string := fmt.Sprintf("[+] cuttlefish enumeration of %v complete!\n", *target)
 	total_scan_time := time.Now().Sub(scan_start).Minutes()
-	total_scan_print := fmt.Sprintf("\t[+] total time: %.2f mins", total_scan_time)
+	total_scan_print := fmt.Sprintf("%.2f mins", total_scan_time)
+	complete_string := fmt.Sprintf("[+] cuttlefish enumeration of %v complete! (%v)\n", *target, total_scan_print)
 	regularPrint(complete_string, logging, true)
-	regularPrint(total_scan_print, logging, true)
 }
 
 
