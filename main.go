@@ -261,11 +261,11 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 						log(scan_logfile_path, scans[i].results)
 					}
 					// log the finishes to main log file
-					complete_char := "+"
+					to_write := fmt.Sprintf("\t[+] scan: %v (%v) [time elapsed: %.2fs]", scans[i].name, scans[i].status, scans[i].elapsed)
 					if scans[i].status == "error" {
-						complete_char = "!"
+						to_write = fmt.Sprintf("\t[!] scan: %v (%v) [time elapsed: %.2fs]", scans[i].error_message, scans[i].status, scans[i].elapsed)
 					}
-					to_write := fmt.Sprintf("\t[%v] scan: %v (%v) [time elapsed: %.2fs]", complete_char, scans[i].name, scans[i].status, scans[i].elapsed)
+					
 					log(logfile_path, to_write)
 					scans[i].logged = true
 				}
@@ -307,12 +307,14 @@ func outputProgress(scans []scan, iteration int) {
 	for i := 0; i < len(scans); i++ {
 		status_character_idx := int(math.Floor(float64(iteration)/1)) % len(status_spin)
 		status_character := status_spin[status_character_idx]
+		status_title := scans[i].name
 		if scans[i].status == "complete" {
 			status_character = "+"
 		} else if scans[i].status == "error" {
 			status_character = "!"
+			status_title = scans[i].error_message
 		}
-		to_write := fmt.Sprintf("\t[%v] scan: %v (%v) [time elapsed: %.2fs]", status_character, scans[i].name, scans[i].status, scans[i].elapsed)
+		to_write := fmt.Sprintf("\t[%v] scan: %v (%v) [time elapsed: %.2fs]", status_character, status_title, scans[i].status, scans[i].elapsed)
 		scans[i].mutex.RLock()
 		if scans[i].status == "complete" {
 			colorPrint(to_write, string_format.green, false, false)
@@ -401,7 +403,7 @@ func performScan(target string, scan_to_perform *scan) {
 			log(logfile_path, error_log_string)
 		}
 		scan_to_perform.status = "error"
-		scan_to_perform.name = error_string
+		scan_to_perform.error_message = error_string
 		}
 	}
 	
@@ -413,8 +415,19 @@ func performScan(target string, scan_to_perform *scan) {
 	scan_to_perform.mutex.RUnlock()
 }
 
+/*
+success condition
+######## Scan started at Tue Jan 23 00:08:42 2018 #########
+192.168.56.3: root exists
+192.168.56.3: mysql exists
+192.168.56.3: user exists
+192.168.56.3: ftp exists
+######## Scan completed at Tue Jan 23 00:08:42 2018 #########
+*/
 func postScanProcessing(completed_scan scan) {
-	// TODO
+	if completed_scan.command == "smtp" {
+		
+	}
 }
 
 // TODO: transforms a list of services into a list of scans
