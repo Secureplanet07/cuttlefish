@@ -30,7 +30,7 @@ var term_height, _ = terminal.Height()
 var status_spin = []string{"\\","|","/","-"}
 
 // output log file
-var logging = false
+var logging = true
 var logfile_root_path string
 var logfile_path string
 
@@ -42,13 +42,13 @@ var script_dir = filepath.Join(working_dir, "scripts")
 var number_of_prints = 0
 
 // arguments to scans
-/*
+//
 var hydra_default_user_wordlist = 	"/root/Documents/tools/SecLists/Usernames/top_shortlist.txt"
 var hydra_default_user_passlist = 	"/root/Documents/tools/SecLists/Passwords/best1050.txt"
 var gobuster_default_dirlist = 		"/root/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
 var gobuster_default_filelist = 	"/root/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt"
 var smtp_default_namelist = 		"/root/Documents/tools/SecLists/Usernames/top_shortlist.txt"
-//*/
+/*
 var hydra_default_user_wordlist = 	"/Users/coastal//Documents/tools/SecLists/Usernames/top_shortlist.txt"
 var hydra_default_user_passlist = 	"/Users/coastal/Documents/tools/SecLists/Passwords/best1050.txt"
 var gobuster_default_dirlist = 		"/Users/coastal/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
@@ -222,7 +222,7 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 				// gross..but prevents a logging:false, logged=true loop write
 				if logging && (scans[i].logged == false) {
 					number_of_tabs := tabsFromNameLength(scans[i].name)
-					tab_padding := strings.Repeat("\t", number_of_tabs)
+					port_padding := strings.Repeat("\t", number_of_tabs)
 
 					// write our actual scan loot outputs to a log file
 					scan_logfile_name := fmt.Sprintf("%v-%v-[port:%v]-%v-.cuttlelog", target, scans[i].name, scans[i].scan_service.port, scan_start)
@@ -238,9 +238,13 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 						log(scan_logfile_path, scans[i].results)
 					}
 					// log the finishes to main log file
-					to_write := fmt.Sprintf("\t[+] scan: %v%v[port:%v]\t(%v)\t[time elapsed: %.2fs]", scans[i].name, tab_padding, scans[i].scan_service.port, scans[i].status, scans[i].elapsed)
+					status_padding := "\t"
 					if scans[i].status == "error" {
-						to_write = fmt.Sprintf("\t[!] scan: %v%v[port:%v]\t(%v)\t[time elapsed: %.2fs]", scans[i].name, tab_padding, scans[i].scan_service.port, scans[i].status, scans[i].elapsed)
+						status_padding = "\t\t"
+					}
+					to_write := fmt.Sprintf("\t[+] scan: %v%v[port:%v]\t(%v)%v[time elapsed: %.2fs]", scans[i].name, port_padding, scans[i].scan_service.port, scans[i].status, status_padding, scans[i].elapsed)
+					if scans[i].status == "error" {
+						to_write = fmt.Sprintf("\t[!] scan: %v%v[port:%v]\t(%v)%v[time elapsed: %.2fs]", scans[i].name, port_padding, scans[i].scan_service.port, scans[i].status, status_padding, scans[i].elapsed)
 					}
 					
 					log(logfile_path, to_write)
