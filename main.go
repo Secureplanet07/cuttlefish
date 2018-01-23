@@ -3,10 +3,13 @@ package main
 import (
 	"os"
 	"fmt"
+	//"net"
 	"flag"
 	"math"
 	"sync"
 	"time"
+	//"bytes"
+	"errors"
 	"regexp"
 	"strings"
 	"syscall"
@@ -36,7 +39,7 @@ var term_height, _ = terminal.Height()
 var status_spin = []string{"\\","|","/","-"}
 
 // output log file
-var logging = true
+var logging = false
 var logfile_root_path string
 var logfile_path string
 
@@ -48,6 +51,7 @@ var hydra_default_user_wordlist = 	"~/Documents/tools/SecLists/Usernames/top_sho
 var hydra_default_user_passlist = 	"~/Documents/tools/SecLists/Passwords/best1050.txt"
 var gobuster_default_dirlist = 		"~/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
 var gobuster_default_filelist = 	"~/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt"
+var smtp_default_namelist = 		"~/Documents/tools/SecLists/Usernames/top_shortlist.txt"
 
 // struct to hold string value of AWS credentials
 type creds struct {
@@ -58,6 +62,7 @@ type creds struct {
 // struct to hold information about a scan
 type scan struct {
 	mutex *sync.RWMutex
+	scan_type string
 	name string
 	command string
 	args []string
@@ -228,7 +233,24 @@ func performScan(target string, scan_to_perform *scan) {
 	scan_to_perform.mutex.RLock()
 	scan_to_perform.status = "running"
 	scan_to_perform.mutex.RUnlock()
-	out, err := exec.Command(scan_to_perform.command, scan_to_perform.args...).Output()
+	// scope vars to be handled by both os and cuttlefish scans
+	var out []byte
+	var err error
+	// if our scan is an external command (nmap, dirb, etc)
+	if scan_to_perform.scan_type == "os" {
+		out, err = exec.Command(scan_to_perform.command, scan_to_perform.args...).Output()
+	} else {
+		// if our scans are cuttlefish scans
+		// if our scan is an SMTP scan
+		if scan_to_perform.name == "smtp" {
+			scan_channel := make(chan bool)
+			go SMTPEnum(target, scan_to_perform, scan_channel)
+			<-scan_channel
+			if strings.Contains(string(scan_to_perform.results), "error") {
+				err = errors.New("smtp error...check logs")
+			}
+		}
+	}
 	if err != nil {
 		error_string := fmt.Sprintf("%v:%v", 
 			scan_to_perform.command, err)
@@ -246,6 +268,10 @@ func performScan(target string, scan_to_perform *scan) {
 		scan_to_perform.status = "complete"
 	}
 	scan_to_perform.mutex.RUnlock()
+}
+
+func postScanProcessing(completed_scan scan) {
+	// TODO
 }
 
 func scanProgress(scans []scan, target string, scan_channel chan bool) {
@@ -399,20 +425,81 @@ func removeDuplicateServices(service_list []service) []service {
 	return unique_services
 }
 
+func SMTPEnum(target string, scan_to_run *scan, return_channel chan bool) {
+	// TODO...this is all weird. the return channel is blocking past when
+	// the return bool is sent to it.
+
+	/*
+	regularPrint("[*] enum smtp", logging, true)
+	var results_buffer bytes.Buffer
+	// open the enum wordlist file
+	var f *os.File
+	var err error
+	if _, err := os.Stat(smtp_default_namelist); os.IsNotExist(err) {
+		regularPrint("[-] wordlist doesn't exist", logging, true)
+		error_mes := fmt.Sprintf("[-] SMTP namelist file does not exist")
+		results_buffer.WriteString(error_mes)
+		buffer_str := fmt.Sprintf("[*] wrote to buffer: %v", results_buffer.Bytes())
+		regularPrint(buffer_str, logging, true)
+		scan_to_run.results = string(results_buffer.Bytes())
+		regularPrint("[*] wrote to scan", logging, true)
+		return_channel <- true
+		regularPrint("[*] wrote to channel", logging, true)
+	}
+	regularPrint("[*] wordlist exists", logging, true)
+	defer f.Close()
+	f, err = os.OpenFile(smtp_default_namelist, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		error_mes := fmt.Sprintf("[-] cannot open SMTP namelist file")
+		results_buffer.WriteString(error_mes)
+		scan_to_run.results = string(results_buffer.Bytes())
+		return_channel <- true
+	}
+	// read the file and split the lines into names to brute force
+	//		TODO
+	//
+	ip_addr, ip_err := net.ResolveTCPAddr("tcp4", target)
+	if ip_err != nil {
+		error_mes := fmt.Sprintf("[-] could not resolve IP address %v", target)
+		results_buffer.WriteString(error_mes)
+		scan_to_run.results = string(results_buffer.Bytes())
+		return_channel <- true
+	}
+	conn, c_err := net.DialTCP("tcp", nil, ip_addr)
+	if c_err != nil {
+		error_mes := "[-] could not connect to target"
+		results_buffer.WriteString(error_mes)
+		scan_to_run.results = string(results_buffer.Bytes())
+		return_channel <- true
+	}
+	_, err = conn.Write([]byte("root"))
+	/*result, w_err := ioutil.ReadAll(conn)
+	if w_err != nil {
+		error_mes := "[-] could not write to target"
+		results_buffer.WriteString(error_mes)
+		return_channel <- results_buffer.String()
+	}
+	results_buffer.WriteString("test string")
+	scan_to_run.results = string(results_buffer.Bytes())
+	//*/
+	scan_to_run.status = "error"
+	return_channel <- true 
+}
+
 // TODO: transforms a list of services into a list of scans
 // converts services identified by nmap output into `scan` structs for
 // downstream processing.
 func makeServiceScanList(target string, service_list []service) []scan {
 	/*
 	services covered by reconscan.py:
-		-ssh
-		-smtp
-		-snmp
-		-domain
-		-ftp
-		-microsoft-ds
-		-ms-sql
-		-http/s
+		[x] ssh
+		[ ] smtp
+		[ ] snmp
+		[ ] domain
+		[ ] ftp
+		[x] http/s
+		[ ] microsoft-ds
+		[ ] ms-sql
 	*/
 	service_scan_list := []scan{}
 	for i := 0; i < len(service_list); i++ {
@@ -420,14 +507,17 @@ func makeServiceScanList(target string, service_list []service) []scan {
 		// set up scans for identified services
 		if current_service.name == "ssh" {
 			hydra_args := []string{"-L", hydra_default_user_wordlist, "-P", hydra_default_user_passlist, "-f", "-u", target, "-s", current_service.port, "ssh"}
-			new_scan := scan{&sync.RWMutex{}, "ssh hydra brute", "hydra", hydra_args, "", "initialized", 0, false}
+			new_scan := scan{&sync.RWMutex{}, "os", "ssh hydra brute", "hydra", hydra_args, "", "initialized", 0, false}
 			service_scan_list = append(service_scan_list, new_scan)
-		} else if current_service.name == "http" {
+		} else if current_service.name == "smtp" {
+			new_scan := scan{&sync.RWMutex{}, "cuttlefish", "smtp enum", "smtp", []string{}, "", "initialized", 0, false}
+			service_scan_list = append(service_scan_list, new_scan)
+		} else if current_service.name == "http" || current_service.name == "ssl/http" ||
+			strings.Contains(current_service.name, "https") {
 			gobuster_args := []string{"-u", target, "-w", gobuster_default_dirlist}
-			new_scan := scan{&sync.RWMutex{}, "gobuster enumeration", "gobuster", gobuster_args, "", "initialized", 0, false}
+			new_scan := scan{&sync.RWMutex{}, "os", "gobuster enumeration", "gobuster", gobuster_args, "", "initialized", 0, false}
 			service_scan_list = append(service_scan_list, new_scan)
 		}
-		// nmap -vv -sV -Pn -p %s --script=ms-sql-info,ms-sql-config,ms-sql-dump-hashes --script-args=mssql.instance-port=1433,smsql.username-sa,mssql.password-sa
 	}
 	return service_scan_list
 }
@@ -487,10 +577,10 @@ func main() {
 	cuttle_header_2 := "           O  o `- o ,-`           `.o `._./            "
 	cuttle_header_3 := "o   O   o   o _O  o /   cuttlefish   \\ O  o    O   o   O"
 	cuttle_header_4 := "__o___O____,-`  `\\_*         v0.0     \\._____o___coastal"
-	regularPrint(cuttle_header_1, logging, true)
-	regularPrint(cuttle_header_2, logging, true)
-	regularPrint(cuttle_header_3, logging, true)
-	regularPrint(cuttle_header_4, logging, true)
+	colorPrint(cuttle_header_1, string_format.blue,logging, true)
+	colorPrint(cuttle_header_2, string_format.blue,logging, true)
+	colorPrint(cuttle_header_3, string_format.blue,logging, true)
+	colorPrint(cuttle_header_4, string_format.blue,logging, true)
 	// var aws_session *session.Session
 	if *target == "d34db33f" {
 		colorPrint("[!] specify a target with '-target=TARGET_IP'", string_format.red, logging, true)
@@ -503,9 +593,9 @@ func main() {
 	// runmode summary
 	opt_1 := fmt.Sprintf("[*] run options")
 	logfile_path_string := fmt.Sprintf("\t[*] logging to %v", logfile_root_path)
-	opt_2 := fmt.Sprintf("\t[*] target %v", *target)
-	opt_3 := fmt.Sprintf("\t[*] aws tentacles %v", *tentacles)
-	colorPrint(opt_1, string_format.blue, logging, true)
+	opt_2 := fmt.Sprintf("\t[*] target:\t\t%v", *target)
+	opt_3 := fmt.Sprintf("\t[*] aws tentacles:\t%v", *tentacles)
+	regularPrint(opt_1, logging, true)
 	if logging {
 		regularPrint(logfile_path_string, logging, true)
 	}
@@ -514,8 +604,8 @@ func main() {
 	
 	// initialize the scans
 	var scans []scan
-	nmap_tcp_scan := scan{&sync.RWMutex{}, "initial nmap TCP recon", "nmap", []string{}, "", "initialized", 0, false}
-	nmap_udp_scan := scan{&sync.RWMutex{}, "initial nmap UDP recon", "nmap", []string{}, "", "initialized", 0, false}
+	nmap_tcp_scan := scan{&sync.RWMutex{}, "os", "initial nmap TCP recon", "nmap", []string{}, "", "initialized", 0, false}
+	nmap_udp_scan := scan{&sync.RWMutex{}, "os", "initial nmap UDP recon", "nmap", []string{}, "", "initialized", 0, false}
 	if os.Getuid() == 0 {
 		getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v), script scanning with nmap", os.Getuid())
 		colorPrint(getuid_string, string_format.green, logging, true)
@@ -579,6 +669,12 @@ func main() {
 	}
 	go scanProgress(scans, *target, service_scan_channel)
 	<-service_scan_channel
+
+	// process the post-scan results and perform any subsequent analysis
+	// or further enum/discovery
+	for i := 0; i < len(scans); i++ {
+		postScanProcessing(scans[i])
+	}
 
 	complete_string := fmt.Sprintf("[+] cuttlefish enumeration of %v complete!\n", *target)
 	regularPrint(complete_string, logging, true)
