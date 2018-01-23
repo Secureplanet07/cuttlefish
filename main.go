@@ -396,9 +396,9 @@ func performScan(target string, scan_to_perform *scan) {
 		
 		if err != nil {
 		error_string := fmt.Sprintf("%v:%v", 
-			scan_to_perform.command, err)
+			scan_to_perform.name, err)
 		error_log_string := fmt.Sprintf("[!] error running (%v)\n\t%v", 
-			scan_to_perform.command, err)
+			scan_to_perform.name, err)
 		if logging {
 			log(logfile_path, error_log_string)
 		}
