@@ -685,6 +685,8 @@ func main() {
 	}
 
 	complete_string := fmt.Sprintf("[+] cuttlefish enumeration of %v complete!\n", *target)
+	total_scan_time := current_time.Sub(scan_start).Minutes()
+	total_scan_print := fmt.Sprintf("\t[+] total time: %.2f mins", total_scan_time)
 	regularPrint(complete_string, logging, true)
 }
 
