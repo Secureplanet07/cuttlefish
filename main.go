@@ -40,6 +40,10 @@ var logging = true
 var logfile_root_path string
 var logfile_path string
 
+// location of enum scripts
+var working_dir,_ = os.Getwd()
+var script_dir = filepath.Join(working_dir, "scripts")
+
 // track number of prints to properly format 'flush' printing
 var number_of_prints = 0
 
@@ -462,7 +466,8 @@ func makeServiceScanList(target string, service_list []service) []scan {
 			hydra_scan := scan{&sync.RWMutex{}, "os", "hydra-ssh-brute", "hydra", hydra_args, "", "initialized", 0, false, ""}
 			service_scan_list = append(service_scan_list, hydra_scan)
 		} else if current_service.name == "smtp" {
-			smtp_user_enum_scan := scan{&sync.RWMutex{}, "os", "smtp-user-enum", "smtp-user-enum.pl", []string{"-U", smtp_default_namelist, "-t", target, "-p", current_service.port}, "", "initialized", 0, false, ""}
+			full_smtp_enum_script_path := filepath.Join(script_dir, "smtp-user-enum.pl")
+			smtp_user_enum_scan := scan{&sync.RWMutex{}, "os", "smtp-user-enum", full_smtp_enum_script_path, []string{"-U", smtp_default_namelist, "-t", target, "-p", current_service.port}, "", "initialized", 0, false, ""}
 			// https://github.com/xapax/oscp/blob/master/recon_enum/reconscan.py
 			smtp_nmap_scan_args := []string{"-sV", "-Pn", "-p", current_service.port, "--script=smtp-commands,smtp-enum-users,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720,smtp-vuln-cve2011-1764", target}
 			smtp_nmap_scan := scan{&sync.RWMutex{}, "os", "smtp-nmap-enum", "nmap", smtp_nmap_scan_args, "", "initialized", 0, false, ""}
