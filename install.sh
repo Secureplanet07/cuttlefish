@@ -1,13 +1,17 @@
 #!/bin/bash
 
+install_dir = "$(pwd)"
+
 # install golang if not present
 echo "[*] checking if golang is installed"
 if ! [[ -x "$(command -v go)" ]]
 then
 	echo "[!] golang not installed, installing golang to /usr/local/"
-	curl -O 'https://dl.google.com/go/go1.9.3.linux-amd64.tar.gz' ~/Downloads/go1.9.3.linux-amd64.tar.gz
+	cd ~/Downloads
+	curl -O 'https://dl.google.com/go/go1.9.3.linux-amd64.tar.gz'
 	tar -C /usr/local -xzf ~/Downloads/go1.9.3.linux-amd64.tar.gz
 	export PATH="$PATH:/usr/local/go/bin"
+	cd $install_dir
 fi
 echo "[+] golang is installed!"
 
