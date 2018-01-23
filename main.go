@@ -54,6 +54,14 @@ var gobuster_default_dirlist = 		"/Users/coastal/Documents/tools/SecLists/Discov
 var gobuster_default_filelist = 	"/Users/coastal/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt"
 var smtp_default_namelist = 		"/Users/coastal/Documents/tools/SecLists/Usernames/top_shortlist.txt"
 
+// stuff to keep track of the prints so we can update the terminal ouput
+// properly when we print past the end of the terminal
+var previous_prints = []previous_print{}
+type previous_print struct {
+	print_color string // "regular" or the color
+	print_string string
+}
+
 // struct to hold string value of AWS credentials
 type creds struct {
 	AccessKey string
@@ -151,12 +159,18 @@ func log(log_filepath string, message string) {
 	}
 }
 
+func addToPreviousPrints(print_color string, print_string string) {
+	print_instance := previous_print{print_color, print_string}
+	previous_prints = append(previous_prints, print_instance)
+}
+
 func regularPrint(print_string string, logging bool, tracking bool) {
 	if logging {
 		log(logfile_path, print_string)
 	}
 	if tracking {
 		number_of_prints += 1
+		addToPreviousPrints("regular", print_string)
 	}
 	fmt.Printf("%v\n", print_string)
 }
@@ -167,6 +181,7 @@ func colorPrint(print_string string, color string, logging bool, tracking bool) 
 	}
 	if tracking {
 		number_of_prints += 1
+		addToPreviousPrints(color, print_string)
 	}
 	fmt.Printf("%v%v%v\n", color, print_string, string_format.end)
 }
@@ -295,18 +310,63 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 	scan_channel <- true
 }
 
-func outputProgress(scans []scan, iteration int) {
+func previousPrint(previous_print_instance previous_print) {
+	if previous_print_instance.print_color == "regular" {
+		regularPrint(previous_print_instance.print_string, false, false)
+	} else {
+		colorPrint(previous_print_instance.print_string, previous_print_instance.print_color, false, false)
+	}
+}
+
+// returns the terminal y-axis coordinates for formatting print locations
+// 		given a list of scans and a list of previous prints
+// output:
+//		(int) index of first previous print (inside of previous prints array)
+//		(int) number of previous prints to print
+//		(int) terminal height of first printed scan
+func getTermPrintOffsets(scans []scan, previous_prints_array []previous_print) (int, int, int) {
+	num_prev_prints := int(term_height) - len(scans)
+	last_index := len(previous_prints) - 1
+	start_index := last_index - num_prev_prints
+	if start_index < 0 {
+		start_index = 0
+	}
+	if num_prev_prints > len(previous_prints_array) {
+		num_prev_prints = len(previous_prints_array)
+	}
 
 	// this will buffer our output updating the scan results
-	// without overwriting previous command line output
-	output_height := (number_of_prints + 1) //% int(y)
-	fmt.Printf("\033[%v;0H", output_height)
-	// overwrite with blank lines 
-	for i := 0; i < len(scans); i++ {
-		blank_line := strings.Repeat(" ", int(term_width))
-		fmt.Println(blank_line)
+	// it first clears any previous content that was on those lines
+	output_height := num_prev_prints + 1
+	return start_index, num_prev_prints, output_height
+}
+
+func outputProgress(scans []scan, iteration int) {
+	// set these every time so that we can resize
+	term_width, _ = terminal.Width()
+	term_height, _ = terminal.Height()
+
+	// this needs to write in the previous content to the terminal to
+	// take care of the case in which we want to write to a position that is
+	// past the end of the terminal
+
+	// first clear the entire terminal
+	print("\033[H\033[2J")
+	// now write in the previous lines
+	// there are a few conditions
+	//	1. we write the number of previous lines, from the last-written, that
+	//		leaves enough room for the active scans
+	//	2. if there are more lines than can fit, only take the bottom n lines
+	//		where n = term_height - len(scans)
+	first_print_index, num_prev_prints_to_print, first_scan_print_height := getTermPrintOffsets(scans, previous_prints)
+	
+	for i:= 0; i < num_prev_prints_to_print; i++ {
+		previousPrint(previous_prints[i+first_print_index])
 	}
-	fmt.Printf("\033[%v;0H", output_height)
+	// write in all the active scans below the previous content
+	// this skips our write start to the height of the number of scans we have
+	fmt.Printf("\033[%v;0H", first_scan_print_height)
+
 	// overwrite with updated scan results
 	for i := 0; i < len(scans); i++ {
 		status_character_idx := int(math.Floor(float64(iteration)/1)) % len(status_spin)
