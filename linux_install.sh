@@ -9,7 +9,7 @@ then
 	echo "[!] golang not installed, installing golang to /usr/local/"
 	cd ~/Downloads
 	curl -O 'https://dl.google.com/go/go1.9.3.linux-amd64.tar.gz'
-	tar -C /usr/local -xzf ~/Downloads/go1.9.3.linux-amd64.tar.gz
+	sudo tar -C /usr/local -xzf ~/Downloads/go1.9.3.linux-amd64.tar.gz
 	export PATH="$PATH:/usr/local/go/bin"
 	cd $install_dir
 fi
