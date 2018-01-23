@@ -30,7 +30,7 @@ var term_height, _ = terminal.Height()
 var status_spin = []string{"\\","|","/","-"}
 
 // output log file
-var logging = true
+var logging = false
 var logfile_root_path string
 var logfile_path string
 
@@ -42,13 +42,13 @@ var script_dir = filepath.Join(working_dir, "scripts")
 var number_of_prints = 0
 
 // arguments to scans
-//
+/*
 var hydra_default_user_wordlist = 	"/root/Documents/tools/SecLists/Usernames/top_shortlist.txt"
 var hydra_default_user_passlist = 	"/root/Documents/tools/SecLists/Passwords/best1050.txt"
 var gobuster_default_dirlist = 		"/root/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
 var gobuster_default_filelist = 	"/root/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt"
 var smtp_default_namelist = 		"/root/Documents/tools/SecLists/Usernames/top_shortlist.txt"
-/*
+//*/
 var hydra_default_user_wordlist = 	"/Users/coastal//Documents/tools/SecLists/Usernames/top_shortlist.txt"
 var hydra_default_user_passlist = 	"/Users/coastal/Documents/tools/SecLists/Passwords/best1050.txt"
 var gobuster_default_dirlist = 		"/Users/coastal/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
@@ -189,6 +189,16 @@ func colorPrint(print_string string, color string, logging bool, tracking bool) 
 	fmt.Printf("%v%v%v\n", color, print_string, string_format.end)
 }
 
+func tabsFromNameLength(name string) int {
+	max_len := 17
+	diff := math.Abs(float64(max_len) - float64(len(name)))
+	tabs := 3 - int(math.Floor(7 / float64(diff)))
+	if tabs <= 0 {
+		return 1
+	}
+	return tabs
+}
+
 func scanProgress(scans []scan, target string, scan_channel chan bool) {
 	start_time := time.Now()
 	finished := 0
@@ -211,6 +221,9 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 				completion_statuses = append(completion_statuses, 1)
 				// gross..but prevents a logging:false, logged=true loop write
 				if logging && (scans[i].logged == false) {
+					number_of_tabs := tabsFromNameLength(scans[i].name)
+					tab_padding := strings.Repeat("\t", number_of_tabs)
+
 					// write our actual scan loot outputs to a log file
 					scan_logfile_name := fmt.Sprintf("%v-%v-[port:%v]-%v-.cuttlelog", target, scans[i].name, scans[i].scan_service.port, scan_start)
 					scan_logfile_path := filepath.Join(logfile_root_path, scan_logfile_name)
@@ -225,9 +238,9 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 						log(scan_logfile_path, scans[i].results)
 					}
 					// log the finishes to main log file
-					to_write := fmt.Sprintf("\t[+] scan: %v\t[port:%v]\t(%v)\t[time elapsed: %.2fs]", scans[i].name, scans[i].scan_service.port, scans[i].status, scans[i].elapsed)
+					to_write := fmt.Sprintf("\t[+] scan: %v%v[port:%v]\t(%v)\t[time elapsed: %.2fs]", scans[i].name, tab_padding, scans[i].scan_service.port, scans[i].status, scans[i].elapsed)
 					if scans[i].status == "error" {
-						to_write = fmt.Sprintf("\t[!] scan: %v\t[port:%v]\t(%v)\t[time elapsed: %.2fs]", scans[i].name, scans[i].scan_service.port, scans[i].status, scans[i].elapsed)
+						to_write = fmt.Sprintf("\t[!] scan: %v%v[port:%v]\t(%v)\t[time elapsed: %.2fs]", scans[i].name, tab_padding, scans[i].scan_service.port, scans[i].status, scans[i].elapsed)
 					}
 					
 					log(logfile_path, to_write)
@@ -271,7 +284,11 @@ func previousPrint(previous_print_instance previous_print) {
 //		(int) terminal height of first printed scan
 func getTermPrintOffsets(scans []scan, previous_prints_array []previous_print) (int, int, int) {
 	// -1 because the active print line takes up one space (cursor)
-	num_prev_prints := int(term_height) - 1 - len(scans)
+	num_prev_prints := int(term_height) - len(scans) - 1
+	// if we are truncating, truncate by another space to make room for cursor
+	if len(previous_prints) > (int(term_height) - 1) {
+		num_prev_prints = num_prev_prints - 1
+	}
 	last_index := len(previous_prints) - 1
 	start_index := last_index - num_prev_prints
 	if start_index < 0 {
@@ -283,7 +300,7 @@ func getTermPrintOffsets(scans []scan, previous_prints_array []previous_print) (
 
 	// this will buffer our output updating the scan results
 	// it first clears any previous content that was on those lines
-	output_height := num_prev_prints + 1
+	output_height := num_prev_prints + 1 // to avoid overwriting 
 	return start_index, num_prev_prints, output_height
 }
 
@@ -323,7 +340,13 @@ func outputProgress(scans []scan, iteration int) {
 		} else if scans[i].status == "error" {
 			status_character = "!"
 		}
-		to_write := fmt.Sprintf("\t[%v] scan: %v\t[port:%v]\t(%v)\t[time elapsed: %.2fs]", status_character, status_title, scans[i].scan_service.port, scans[i].status, scans[i].elapsed)
+		number_of_tabs := tabsFromNameLength(scans[i].name)
+		port_tab_padding := strings.Repeat("\t", number_of_tabs)
+		status_tab_padding := "\t"
+		if scans[i].status == "error" {
+			status_tab_padding = "\t\t"
+		}
+		to_write := fmt.Sprintf("\t[%v] scan: %v%v[port:%v]\t(%v)%v[time elapsed: %.2fs]", status_character, status_title, port_tab_padding, scans[i].scan_service.port, scans[i].status, status_tab_padding, scans[i].elapsed)
 		scans[i].mutex.RLock()
 		if scans[i].status == "complete" {
 			colorPrint(to_write, string_format.green, false, false)
@@ -634,8 +657,8 @@ func main() {
 	} else {
 		getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), script scanning not performed", os.Getuid())
 		colorPrint(getuid_string, string_format.yellow, logging, true)
-		nmap_tcp_scan.args = []string{"-vv", "-Pn", "-A", "-p-", *target}
-		//nmap_tcp_scan.args = []string{*target}
+		//nmap_tcp_scan.args = []string{"-vv", "-Pn", "-A", "-p-", *target}
+		nmap_tcp_scan.args = []string{*target}
 		// don't bother with UDP since we can't w/o root
 		scans = append(scans, nmap_tcp_scan)
 	}
