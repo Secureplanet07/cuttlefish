@@ -494,28 +494,10 @@ func postScanProcessing(completed_scan scan) {
 	}
 }
 
-/*
-// struct to hold information about a scan
-type scan struct {
-	mutex *sync.RWMutex
-	scan_type string
-	name string 		// also logfile name
-	command string
-	args []string
-	results string
-	status string
-	elapsed float64
-	logged bool
-	error_message string
-	scan_service *service
-	start_time time.Time
-}
-*/
-
 func createOSServiceScan(current_service *service, name string, command string, args []string) scan {
 	new_scan := scan{
 		&sync.RWMutex{},
-		"os",
+		"os",				// scan type
 		name,
 		command,
 		args,
