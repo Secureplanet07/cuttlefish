@@ -366,8 +366,17 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 		iteration += 1
 		completion_statuses := updateScansAndReturnCompletionReport(scans)
 		if allSame(completion_statuses) && completion_statuses[0] == 1 {
-			// print the final state
-			outputProgress(scans)
+			// print the final state TODO: print them here
+			// add them to the previousPrints so that they will print after completion
+			addScansToPreviousPrints(scans)
+			// we pass an empty list of scans because all of the previous scans will
+			// still be printed (since we added them to previous_prints), but
+			// outputProgress prints all of the scans in the []scan it is passed
+			// regardless of progress status.
+			// this way, all of our completed scans will be printed as a part of
+			// previous_prints, and not printed again because they are not
+			// sent in the scan array
+			outputProgress([]scan{})
 			finished = 1
 
 		} else {
@@ -376,8 +385,6 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 			time.Sleep(100000000)
 		}
 	}
-	// add them to the previousPrints so that they will print after completion
-	addScansToPreviousPrints(scans)
 	// update tracked prints for number of scans
 	scan_channel <- true
 }
