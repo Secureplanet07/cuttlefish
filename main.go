@@ -661,8 +661,8 @@ func main() {
 	} else {
 		getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), script scanning not performed", os.Getuid())
 		colorPrint(getuid_string, string_format.yellow, logging, true)
-		//nmap_tcp_scan.args = []string{"-vv", "-Pn", "-A", "-p-", *target}
-		nmap_tcp_scan.args = []string{*target}
+		nmap_tcp_scan.args = []string{"-vv", "-Pn", "-A", "-p-", *target}
+		//nmap_tcp_scan.args = []string{*target}
 		// don't bother with UDP since we can't w/o root
 		scans = append(scans, nmap_tcp_scan)
 	}
