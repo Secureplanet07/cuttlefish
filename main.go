@@ -205,6 +205,29 @@ func colorPrint(print_string string, color string, logging bool, tracking bool) 
 	fmt.Printf("%v%v%v\n", color, print_string, string_format.end)
 }
 
+func scanPrint(scan_to_print scan, logging bool, tracking bool) {
+	scan_formatted := formatScan(&scan_to_print)
+	scan_color := ""
+	if scan_to_print.status == "complete" {
+		scan_color = string_format.green
+	} else if scan_to_print.status == "error" {
+		scan_color = string_format.red
+	} else if scan_to_print.status == "initialized" {
+		scan_color = string_format.blue
+	} else {
+		scan_color = string_format.yellow
+	}
+	scan_color_formatted := fmt.Sprintf("%v%v%v", scan_color, scan_formatted, string_format.end)
+	if tracking {
+		if logging {
+			log(logfile_path, scan_formatted)
+		}
+		number_of_prints += 1
+		addToPreviousPrints(scan_color, scan_formatted)
+	}
+	fmt.Printf(scan_color_formatted)
+}
+
 func tabsFromNameLength(name string) int {
 	max_len := 17
 	diff := math.Abs(float64(max_len) - float64(len(name)))
@@ -274,10 +297,6 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 					} else {
 						log(scan_logfile_path, current_scan.results)
 					}
-					// log the finishes to main log file
-					to_write := formatScan(&current_scan)
-					log(logfile_path, to_write)
-					current_scan.logged = true
 				}
 			} else {
 				completion_statuses = append(completion_statuses, 0)
@@ -295,8 +314,15 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 			time.Sleep(100000000)
 		}
 	}
+	// finally, print the result of all scans so that we count them in the total
+	// lines printed and they persist in the printed lines
+	for i := 0; i < len(scans); i++ {
+		current_scan := scans[i]
+		// log the finishes to main log file
+		scanPrint(current_scan, logging, true)
+		current_scan.logged = true
+	}
 	// update tracked prints for number of scans
-	number_of_prints += len(scans)
 	scan_channel <- true
 }
 
@@ -365,17 +391,8 @@ func outputProgress(scans []scan) {
 	// overwrite with updated scan results
 	for i := 0; i < len(scans); i++ {
 		current_scan := scans[i]
-		to_write := formatScan(&current_scan)
 		current_scan.mutex.RLock()
-		if current_scan.status == "complete" {
-			colorPrint(to_write, string_format.green, false, false)
-		} else if current_scan.status == "running" {
-			colorPrint(to_write, string_format.yellow, false, false)
-		} else if current_scan.status == "error" {
-			colorPrint(to_write, string_format.red, false, false)
-		} else {
-			colorPrint(to_write, string_format.blue, false, false)
-		}
+		scanPrint(current_scan, logging, false)
 		current_scan.mutex.RUnlock()
 	}
 }
