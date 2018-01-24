@@ -39,17 +39,14 @@ var logfile_path string
 var working_dir,_ = os.Getwd()
 var script_dir = filepath.Join(working_dir, "scripts")
 
-// track number of prints to properly format 'flush' printing
-var number_of_prints = 0
-
 // arguments to scans
-//
+/*
 var hydra_default_user_wordlist = 	"/root/Documents/tools/SecLists/Usernames/top_shortlist.txt"
 var hydra_default_user_passlist = 	"/root/Documents/tools/SecLists/Passwords/best1050.txt"
 var gobuster_default_dirlist = 		"/root/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
 var gobuster_default_filelist = 	"/root/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt"
 var smtp_default_namelist = 		"/root/Documents/tools/SecLists/Usernames/top_shortlist.txt"
-/*
+//*/
 var hydra_default_user_wordlist = 	"/Users/coastal//Documents/tools/SecLists/Usernames/top_shortlist.txt"
 var hydra_default_user_passlist = 	"/Users/coastal/Documents/tools/SecLists/Passwords/best1050.txt"
 var gobuster_default_dirlist = 		"/Users/coastal/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
@@ -130,7 +127,8 @@ func cleanup(scans []scan) {
 			log(scan_logfile_path, current_scan.results)
 		}
 	}
-	colorPrint("\n[!] caught Ctl-C ... cleaning up\033c", string_format.yellow, logging, true)
+	ctl_c_string := fmt.Sprintf("\n[!] caught Ctl-C ... cleaning up%v", string_format.end)
+	colorPrint(ctl_c_string, string_format.yellow, logging, true)
 	os.Exit(0)
 }
 
@@ -188,7 +186,6 @@ func regularPrint(print_string string, logging bool, tracking bool) {
 		log(logfile_path, print_string)
 	}
 	if tracking {
-		number_of_prints += 1
 		addToPreviousPrints("regular", print_string)
 	}
 	fmt.Printf("%v\n", print_string)
@@ -199,7 +196,6 @@ func colorPrint(print_string string, color string, logging bool, tracking bool) 
 		log(logfile_path, print_string)
 	}
 	if tracking {
-		number_of_prints += 1
 		addToPreviousPrints(color, print_string)
 	}
 	fmt.Printf("%v%v%v\n", color, print_string, string_format.end)
@@ -222,7 +218,6 @@ func scanPrint(scan_to_print scan, logging bool, tracking bool) {
 		if logging {
 			log(logfile_path, scan_formatted)
 		}
-		number_of_prints += 1
 		addToPreviousPrints(scan_color, scan_formatted)
 	}
 	fmt.Printf(scan_color_formatted)
@@ -499,10 +494,267 @@ func postScanProcessing(completed_scan scan) {
 	}
 }
 
+/*
+// struct to hold information about a scan
+type scan struct {
+	mutex *sync.RWMutex
+	scan_type string
+	name string 		// also logfile name
+	command string
+	args []string
+	results string
+	status string
+	elapsed float64
+	logged bool
+	error_message string
+	scan_service *service
+	start_time time.Time
+}
+*/
+
+func createOSServiceScan(current_service *service, name string, command string, args []string) scan {
+	new_scan := scan{
+		&sync.RWMutex{},
+		"os",
+		name,
+		command,
+		args,
+		"",					// results
+		"initialized",		// status
+		0,					// elapsed
+		false,				// logged
+		"",					// error message
+		current_service,	// service
+		scan_start,			// start_time
+	}
+	return new_scan
+}
+
+func addFTPScansToList(service_scan_list []scan, current_service *service) []scan {
+	ftp_nmap_scan_args := []string{
+		"-sV", 
+		"-Pn", 
+		"-vv", 
+		"-p", 
+		current_service.port, 
+		"--script=ftp-anon,ftp-bounce,ftp-libopie,ftp-proftpd-backdoor,f" +
+		"tp-vsftpd-backdoor,ftp-vuln-cve2010-4221", 
+		current_service.target,
+	}
+	hydra_ftp_args := []string{
+		"-L", 
+		hydra_default_user_wordlist, 
+		"-P", 
+		hydra_default_user_passlist, 
+		"-f", 
+		"-u", 
+		current_service.target, 
+		"-s",
+		 current_service.port, 
+		 "ftp",
+	}
+	ftp_nmap_scan := createOSServiceScan(
+		current_service, 
+		"ftp-nmap-scan", 
+		"nmap", 
+		ftp_nmap_scan_args,
+	)
+	hydra_ftp_scan := createOSServiceScan(
+		current_service, 
+		"hydra-ftp-brute", 
+		"hydra", 
+		hydra_ftp_args,
+	)
+	service_scan_list = append(service_scan_list, ftp_nmap_scan)
+	service_scan_list = append(service_scan_list, hydra_ftp_scan)
+	return service_scan_list
+}
+
+func addSSHScansToList(service_scan_list []scan, current_service *service) []scan {
+	hydra_args := []string{
+		"-L", 
+		hydra_default_user_wordlist, 
+		"-P", 
+		hydra_default_user_passlist,
+		"-f",
+		"-u",
+		current_service.target, 
+		"-s", 
+		current_service.port, 
+		"ssh",
+	}
+	hydra_scan := createOSServiceScan(
+		current_service, 
+		"hydra-ssh-brute", 
+		"hydra", 
+		hydra_args,
+	)
+	service_scan_list = append(service_scan_list, hydra_scan)
+	return service_scan_list
+}
+
+func addSMTPScansToList(service_scan_list []scan, current_service *service) []scan {
+	full_smtp_enum_script_path := filepath.Join(script_dir, "smtp-user-enum.pl")
+	smtp_user_enum_scan_args := []string{
+		"-U", 
+		smtp_default_namelist, 
+		"-t", 
+		current_service.target, 
+		"-p", 
+		current_service.port,
+	}
+	smtp_user_enum_scan := createOSServiceScan(
+		current_service,
+		"smtp-user-enum", 
+		full_smtp_enum_script_path, 
+		smtp_user_enum_scan_args,
+	)
+	// https://github.com/xapax/oscp/blob/master/recon_enum/reconscan.py
+	smtp_nmap_scan_args := []string{
+		"-sV", 
+		"-Pn", 
+		"-p", 
+		current_service.port, 
+		"--script=smtp-commands,smtp-enum-users,smtp-vuln-cve2010-4344,s" +
+		"mtp-vuln-cve2011-1720,smtp-vuln-cve2011-1764", 
+		current_service.target,
+	}
+	smtp_nmap_scan := createOSServiceScan(
+		current_service,
+		"smtp-nmap-enum",
+		"nmap",
+		smtp_nmap_scan_args,
+	)
+	service_scan_list = append(service_scan_list, smtp_user_enum_scan)
+	service_scan_list = append(service_scan_list, smtp_nmap_scan)
+	return service_scan_list
+}
+
+func addHTTPScansToList(service_scan_list []scan, current_service *service) []scan {
+	// dynamically alter prefix to either http or https
+	url_target := fmt.Sprintf("http://%v", current_service.target)
+	
+	// if it's an https service, change the url_target to prepend 
+	// https instead of http
+	if strings.Contains(current_service.name, "https") || 
+	current_service.name == "ssl/http" {
+		url_target = fmt.Sprintf("https://%v", current_service.target)
+		
+		// add sslscan scan
+		sslscan_arg := fmt.Sprintf("%v:%v", url_target, current_service.port)
+		sslscan_scan := createOSServiceScan(
+			current_service,
+			"sslscan-scan",
+			"sslscan",
+			[]string{sslscan_arg},
+		)
+		service_scan_list = append(service_scan_list, sslscan_scan)
+	}
+	gobuster_args := []string{
+		"-u", 
+		url_target, 
+		"-w", 
+		gobuster_default_dirlist,
+	}
+	gobuster_scan := createOSServiceScan(
+		current_service,
+		"gobuster-dir-enum", 
+		"gobuster", 
+		gobuster_args,
+	)
+	nikto_scan := createOSServiceScan(
+		current_service,
+		"nikto-scan",
+		"nikto",
+		[]string{"-h", url_target},
+	)
+	http_nmap_scan_args := []string{
+		"-sV", 
+		"-Pn", 
+		"vv", 
+		"-p", 
+		current_service.port, 
+		"--script=http-vhosts,http-userdir-enum,http-apache-negotiation," +
+		"http-backup-finder,http-config-backup,http-default-accounts,htt" +
+		"p-methods,http-method-tamper,http-passwd,http-robots.txt,http-d" +
+		"evframework,http-enum,http-frontpage-login,http-git,http-iis-we" +
+		"bdav-vuln,http-php-version,http-robots.txt,http-shellshock,http" +
+		"-vuln-cve2015-1635", 
+		current_service.target,
+	}
+	http_nmap_scan := createOSServiceScan(
+		current_service,
+		"http-nmap-scan",
+		"nmap",
+		http_nmap_scan_args,
+	)
+	http_curl_scan_args := []string{"-I", url_target}
+	http_curl_scan := createOSServiceScan(
+		current_service,
+		"http-curl-scan",
+		"curl",
+		http_curl_scan_args,
+	)
+	service_scan_list = append(service_scan_list, gobuster_scan)
+	service_scan_list = append(service_scan_list, nikto_scan)
+	service_scan_list = append(service_scan_list, http_nmap_scan)
+	service_scan_list = append(service_scan_list, http_curl_scan)
+	return service_scan_list
+}
+
+func addSMBScansToList(service_scan_list []scan, current_service *service) []scan {
+	smb_nmap_scan_args := []string{
+		"-p", 
+		current_service.port, 
+		"--script=smb-enum-shares,smb-ls,smb-enum-users,smb-mbenum,smb-o" +
+		"s-discovery,smb-security-mode,smb-vuln-cve2009-3103,smb-vuln-ms" +
+		"06-025,smb-vuln-ms07-029,smb-vuln-ms08-067,smb-vuln-ms10-054,sm" +
+		"b-vuln-ms10-061,smb-vuln-regsvc-dos", 
+		current_service.target,
+	}
+	smb_nmap_scan := createOSServiceScan(
+		current_service,
+		"smb-nmap-scan",
+		"nmap",
+		smb_nmap_scan_args,
+	)
+	smb_enumlinux_scan_args := []string{"-a", current_service.target}
+	smb_enumlinux_scan := createOSServiceScan(
+		current_service,
+		"smb-enumlinux-scan",
+		"enum4linux",
+		smb_enumlinux_scan_args,
+	)
+	service_scan_list = append(service_scan_list, smb_nmap_scan)
+	service_scan_list = append(service_scan_list, smb_enumlinux_scan)
+	return service_scan_list
+}
+func addMSSQLScansToList(service_scan_list []scan, current_service *service) []scan {
+	mssql_nmap_script_args := fmt.Sprintf("--script-args=mssql.instance-port=%v,smsql.username-sa,mssql.password-sa", current_service.port)
+	mssql_nmap_scan_args := []string{
+		"-sV", 
+		"-Pn", 
+		"-p", 
+		current_service.port, 
+		"--script=ms-sql-info,ms-sql-config,ms-sql-dump-hashes", 
+		mssql_nmap_script_args, 
+		current_service.target,
+	}
+	mssql_nmap_scan := createOSServiceScan(
+		current_service,
+		"mssql-nmap-scan",
+		"nmap",
+		mssql_nmap_scan_args,
+	)
+	service_scan_list = append(service_scan_list, mssql_nmap_scan)
+	return service_scan_list
+}
+
+
 // TODO: transforms a list of services into a list of scans
 // converts services identified by nmap output into `scan` structs for
 // downstream processing.
-func makeServiceScanList(target string, service_list []service) []scan {
+func makeServiceScanList(service_list []service) []scan {
 	/*
 	services covered by reconscan.py:
 		[x] ssh
@@ -519,60 +771,20 @@ func makeServiceScanList(target string, service_list []service) []scan {
 		current_service := &service_list[i]
 		// set up scans for identified services
 		if current_service.name == "ftp" {
-			ftp_nmap_scan_args := []string{"-sV", "-Pn", "-vv", "-p", current_service.port, "--script=ftp-anon,ftp-bounce,ftp-libopie,ftp-proftpd-backdoor,ftp-vsftpd-backdoor,ftp-vuln-cve2010-4221", target}
-			ftp_nmap_scan := scan{&sync.RWMutex{}, "os", "ftp-nmap-scan", "nmap", ftp_nmap_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
-			hydra_ftp_args := []string{"-L", hydra_default_user_wordlist, "-P", hydra_default_user_passlist, "-f", "-u", target, "-s", current_service.port, "ftp"}
-			hydra_ftp_scan := scan{&sync.RWMutex{}, "os", "hydra-ftp-brute", "hydra", hydra_ftp_args, "", "initialized", 0, false, "", current_service, scan_start}
-			service_scan_list = append(service_scan_list, ftp_nmap_scan)
-			service_scan_list = append(service_scan_list, hydra_ftp_scan)
+			service_scan_list = addFTPScansToList(service_scan_list, current_service)
 		} else if current_service.name == "ssh" {
-			hydra_args := []string{"-L", hydra_default_user_wordlist, "-P", hydra_default_user_passlist, "-f", "-u", target, "-s", current_service.port, "ssh"}
-			hydra_scan := scan{&sync.RWMutex{}, "os", "hydra-ssh-brute", "hydra", hydra_args, "", "initialized", 0, false, "", current_service, scan_start}
-			service_scan_list = append(service_scan_list, hydra_scan)
+			service_scan_list = addSSHScansToList(service_scan_list, current_service)
 		} else if current_service.name == "smtp" {
-			full_smtp_enum_script_path := filepath.Join(script_dir, "smtp-user-enum.pl")
-			smtp_user_enum_scan := scan{&sync.RWMutex{}, "os", "smtp-user-enum", full_smtp_enum_script_path, []string{"-U", smtp_default_namelist, "-t", target, "-p", current_service.port}, "", "initialized", 0, false, "", current_service, scan_start}
-			// https://github.com/xapax/oscp/blob/master/recon_enum/reconscan.py
-			smtp_nmap_scan_args := []string{"-sV", "-Pn", "-p", current_service.port, "--script=smtp-commands,smtp-enum-users,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720,smtp-vuln-cve2011-1764", target}
-			smtp_nmap_scan := scan{&sync.RWMutex{}, "os", "smtp-nmap-enum", "nmap", smtp_nmap_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
-			service_scan_list = append(service_scan_list, smtp_user_enum_scan)
-			service_scan_list = append(service_scan_list, smtp_nmap_scan)
+			service_scan_list = addSMTPScansToList(service_scan_list, current_service)
 		} else if current_service.name == "snmp" {
 			//
-		} else if current_service.name == "http" || current_service.name == "ssl/http" || strings.Contains(current_service.name, "https") {
-			// dynamically alter prefix to either http or https
-			url_target := fmt.Sprintf("http://%v", target)
-			if strings.Contains(current_service.name, "https") {
-				url_target = fmt.Sprintf("https://%v", target)
-				// add sslscan scan
-				sslscan_arg := fmt.Sprintf("%v:%v", url_target, current_service.port)
-				sslscan_scan := scan{&sync.RWMutex{}, "os", "sslscan-scan", "sslscan", []string{sslscan_arg}, "", "initialized", 0, false, "", current_service, scan_start}
-				service_scan_list = append(service_scan_list, sslscan_scan)
-			}
-			gobuster_args := []string{"-u", url_target, "-w", gobuster_default_dirlist}
-			gobuster_scan := scan{&sync.RWMutex{}, "os", "gobuster-dir-enum", "gobuster", gobuster_args, "", "initialized", 0, false, "", current_service, scan_start}
-			nikto_scan := scan{&sync.RWMutex{}, "os", "nikto-scan", "nikto", []string{"-h", url_target}, "", "initialized", 0, false, "", current_service, scan_start}
-			http_nmap_scan_args := []string{"-sV", "-Pn", "vv", "-p", current_service.port, "--script=http-vhosts,http-userdir-enum,http-apache-negotiation,http-backup-finder,http-config-backup,http-default-accounts,http-methods,http-method-tamper,http-passwd,http-robots.txt,http-devframework,http-enum,http-frontpage-login,http-git,http-iis-webdav-vuln,http-php-version,http-robots.txt,http-shellshock,http-vuln-cve2015-1635", target}
-			http_nmap_scan := scan{&sync.RWMutex{}, "os", "http-nmap-scan", "nmap", http_nmap_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
-			http_curl_scan_args := []string{"-I", url_target}
-			http_curl_scan := scan{&sync.RWMutex{}, "os", "http-curl-scan", "curl", http_curl_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
-			service_scan_list = append(service_scan_list, gobuster_scan)
-			service_scan_list = append(service_scan_list, nikto_scan)
-			service_scan_list = append(service_scan_list, http_nmap_scan)
-			service_scan_list = append(service_scan_list, http_curl_scan)
+		} else if current_service.name == "http" || current_service.name == "ssl/http" || 
+		strings.Contains(current_service.name, "https") {	
+			service_scan_list = addHTTPScansToList(service_scan_list, current_service)
 		} else if current_service.name == "microsoft-ds" {
-			smb_nmap_scan_args := []string{"-p", current_service.port, "--script=smb-enum-shares,smb-ls,smb-enum-users,smb-mbenum,smb-os-discovery,smb-security-mode,smb-vuln-cve2009-3103,smb-vuln-ms06-025,smb-vuln-ms07-029,smb-vuln-ms08-067,smb-vuln-ms10-054,smb-vuln-ms10-061,smb-vuln-regsvc-dos", target}
-			smb_nmap_scan := scan{&sync.RWMutex{}, "os", "smb-nmap-scan", "nmap", smb_nmap_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
-			smb_enumlinux_scan_args := []string{"-a", target}
-			smb_enumlinux_scan := scan{&sync.RWMutex{}, "os", "smb-enumlinux-scan", "enum4linux", smb_enumlinux_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
-			service_scan_list = append(service_scan_list, smb_nmap_scan)
-			service_scan_list = append(service_scan_list, smb_enumlinux_scan)
+			service_scan_list = addSMBScansToList(service_scan_list, current_service)
 		} else if current_service.name == "ms-sql" {
-			// nmap -sV -Pn -p %s --script=ms-sql-info,ms-sql-config,ms-sql-dump-hashes --script-args=mssql.instance-port=1433,smsql.username-sa,mssql.password-sa
-			mssql_nmap_script_args := fmt.Sprintf("--script-args=mssql.instance-port=%v,smsql.username-sa,mssql.password-sa", current_service.port)
-			mssql_nmap_scan_args := []string{"-sV", "-Pn", "-p", current_service.port, "--script=ms-sql-info,ms-sql-config,ms-sql-dump-hashes", mssql_nmap_script_args, target}
-			mssql_nmap_scan := scan{&sync.RWMutex{}, "os", "mssql-nmap-scan", "nmap", mssql_nmap_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
-			service_scan_list = append(service_scan_list, mssql_nmap_scan)
+			service_scan_list = addMSSQLScansToList(service_scan_list, current_service)
 		}
 	}
 	return service_scan_list
@@ -680,9 +892,9 @@ func main() {
 		}
 	}
 	
-	spoof_service := service{"all", *target, "all", "all"}
-	nmap_tcp_scan := scan{&sync.RWMutex{}, "os", "nmap-tcp-recon", "nmap", []string{}, "", "initialized", 0, false, "", &spoof_service, scan_start}
-	nmap_udp_scan := scan{&sync.RWMutex{}, "os", "nmap-udp-recon", "nmap", []string{}, "", "initialized", 0, false, "", &spoof_service, scan_start}
+	spoof_service := &service{"all", *target, "all", "all"}
+	nmap_tcp_scan := createOSServiceScan(spoof_service, "nmap-tcp-recon", "nmap", []string{})
+	nmap_udp_scan := createOSServiceScan(spoof_service, "nmap-udp-recon", "nmap", []string{})
 	if os.Getuid() == 0 {
 		getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v), script scanning with nmap", os.Getuid())
 		colorPrint(getuid_string, string_format.green, logging, true)
@@ -739,7 +951,7 @@ func main() {
 	}
 	colorPrint("[*] starting follow up scans on identified services", string_format.blue, logging, true)
 	// start new scans based on the service info
-	scans = makeServiceScanList(*target, identified_services)
+	scans = makeServiceScanList(identified_services)
 	service_scan_channel := make(chan bool)
 	for i := 0; i < len(scans); i++ {
 		go performScan(*target, &scans[i])
@@ -754,7 +966,7 @@ func main() {
 	}
 	total_scan_time := time.Now().Sub(scan_start).Minutes()
 	total_scan_print := fmt.Sprintf("%.2f mins", total_scan_time)
-	complete_string := fmt.Sprintf("[+] cuttlefish enumeration of %v complete! (%v)\033c", *target, total_scan_print)
+	complete_string := fmt.Sprintf("[+] cuttlefish enumeration of %v complete! (%v)%v", *target, total_scan_print, string_format.end)
 	regularPrint(complete_string, logging, true)
 }
 
