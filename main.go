@@ -114,7 +114,7 @@ var string_format = struct {
 }
 
 func cleanup() {
-	colorPrint("\n[!] caught Ctl-C ... cleaning up", string_format.yellow, logging, true)
+	colorPrint("\n[!] caught Ctl-C ... cleaning up\033c", string_format.yellow, logging, true)
 	os.Exit(1)
 }
 
