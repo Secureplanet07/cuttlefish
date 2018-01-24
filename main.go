@@ -35,7 +35,7 @@ var iteration = 0
 var status_spin = []string{"\\","|","/","-"}
 
 // output log file
-var logging = false
+var logging = true
 var logfile_root_path string
 var logfile_path string
 
@@ -239,7 +239,11 @@ func scanPrint(scan_to_print scan, logging bool, tracking bool) {
 	} else {
 		scan_color = string_format.yellow
 	}
-	scan_color_formatted := fmt.Sprintf("%v%v%v\n", scan_color, scan_formatted, string_format.end)
+	scan_color_formatted := fmt.Sprintf("%v%v%v\n", 
+		scan_color, 
+		scan_formatted, 
+		string_format.end,
+	)
 	if tracking {
 		if logging {
 			log(logfile_path, scan_formatted)
@@ -278,17 +282,76 @@ func formatScan(current_scan *scan) string {
 	}
 
 	formatted_scan := fmt.Sprintf("\t[%v] scan: %v%v[port:%v]\t(%v)%v[time elapsed: %.2fs]", 
-		status_character, current_scan.name, port_padding, current_scan.scan_service.port, 
-		current_scan.status, status_padding, current_scan.elapsed)
+		status_character, 
+		current_scan.name, 
+		port_padding, 
+		current_scan.scan_service.port, 
+		current_scan.status, 
+		status_padding, 
+		current_scan.elapsed,
+	)
 
 	return formatted_scan
 }
 
 func formatScanLogfile(current_scan scan) string {
 	scan_logfile_name := fmt.Sprintf("%v-%v-[port:%v]-%v-.cuttlelog", 
-		current_scan.scan_service.target, current_scan.name, current_scan.scan_service.port, scan_start)
+		current_scan.scan_service.target, 
+		current_scan.name, 
+		current_scan.scan_service.port, 
+		scan_start,
+	)
 	scan_logfile_path := filepath.Join(logfile_root_path, scan_logfile_name)
 	return scan_logfile_path
+}
+
+func addScanToPreviousPrints(current_scan scan) {
+	print_color := ""
+	scan_formatted := formatScan(&current_scan)
+	if current_scan.status == "complete" {
+		print_color = string_format.green
+	} else if current_scan.status == "running" {
+		print_color = string_format.yellow
+	} else if current_scan.status == "error" {
+		print_color = string_format.red
+	} else {
+		print_color = string_format.blue
+	}
+	addToPreviousPrints(print_color, scan_formatted)
+}
+
+func addScansToPreviousPrints(scans []scan) {
+	for i := 0; i < len(scans); i++ {
+		addScanToPreviousPrints(scans[i])
+	}
+}
+
+// pass by reference so our changes are to the original scan object
+func updateScansAndReturnCompletionReport(scans []scan) []int {
+	var completion_statuses []int
+	for i := 0; i < len(scans); i++ {
+		current_scan := scans[i]
+		current_scan.mutex.RLock()
+		if current_scan.status == "complete" || current_scan.status == "error" {
+			completion_statuses = append(completion_statuses, 1)
+			// gross..but prevents a logging:false, logged=true loop write
+			if logging && (current_scan.logged == false) {
+				// write our actual scan loot outputs to a log file
+				scan_logfile_path := formatScanLogfile(current_scan)
+				// log the error message if we error out
+				if current_scan.status == "error" {
+					// TODO: why we get cryptic error file output
+					log(scan_logfile_path, current_scan.error_message)
+				} else {
+					log(scan_logfile_path, current_scan.results)
+				}
+			}
+		} else {
+			completion_statuses = append(completion_statuses, 0)
+		}
+		current_scan.mutex.RUnlock()
+	}
+	return completion_statuses
 }
 
 func scanProgress(scans []scan, target string, scan_channel chan bool) {
@@ -301,29 +364,7 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 	finished := 0
 	for 1 > finished {
 		iteration += 1
-		var completion_statuses []int
-		for i := 0; i < len(scans); i++ {
-			current_scan := scans[i]
-			current_scan.mutex.RLock()
-			if current_scan.status == "complete" || current_scan.status == "error" {
-				completion_statuses = append(completion_statuses, 1)
-				// gross..but prevents a logging:false, logged=true loop write
-				if logging && (current_scan.logged == false) {
-					// write our actual scan loot outputs to a log file
-					scan_logfile_path := formatScanLogfile(current_scan)
-					// log the error message if we error out
-					if current_scan.status == "error" {
-						// TODO: why we get cryptic error file output
-						log(scan_logfile_path, current_scan.error_message)
-					} else {
-						log(scan_logfile_path, current_scan.results)
-					}
-				}
-			} else {
-				completion_statuses = append(completion_statuses, 0)
-			}
-			current_scan.mutex.RUnlock()
-		}
+		completion_statuses := updateScansAndReturnCompletionReport(scans)
 		if allSame(completion_statuses) && completion_statuses[0] == 1 {
 			// print the final state
 			outputProgress(scans)
@@ -335,6 +376,8 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 			time.Sleep(100000000)
 		}
 	}
+	// add them to the previousPrints so that they will print after completion
+	addScansToPreviousPrints(scans)
 	// update tracked prints for number of scans
 	scan_channel <- true
 }
