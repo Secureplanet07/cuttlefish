@@ -722,7 +722,7 @@ func main() {
 	}
 	total_scan_time := time.Now().Sub(scan_start).Minutes()
 	total_scan_print := fmt.Sprintf("%.2f mins", total_scan_time)
-	complete_string := fmt.Sprintf("[+] cuttlefish enumeration of %v complete! (%v)\n", *target, total_scan_print)
+	complete_string := fmt.Sprintf("[+] cuttlefish enumeration of %v complete! (%v)\033c", *target, total_scan_print)
 	regularPrint(complete_string, logging, true)
 }
 
