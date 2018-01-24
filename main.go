@@ -326,7 +326,6 @@ func addScansToPreviousPrints(scans []scan) {
 	}
 }
 
-// pass by reference so our changes are to the original scan object
 func updateScansAndReturnCompletionReport(scans []scan) []int {
 	var completion_statuses []int
 	for i := 0; i < len(scans); i++ {
@@ -839,7 +838,9 @@ func makeServiceScanList(service_list []service) []scan {
 		} else if current_service.name == "smtp" {
 			service_scan_list = addSMTPScansToList(service_scan_list, current_service)
 		} else if current_service.name == "snmp" {
-			//
+			// add snmp scans here
+		} else if current_service.name == "domain" {
+			// add domain scans here
 		} else if current_service.name == "http" || current_service.name == "ssl/http" || 
 		strings.Contains(current_service.name, "https") {	
 			service_scan_list = addHTTPScansToList(service_scan_list, current_service)
