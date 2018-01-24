@@ -529,7 +529,7 @@ func makeServiceScanList(target string, service_list []service) []scan {
 			service_scan_list = append(service_scan_list, http_nmap_scan)
 			service_scan_list = append(service_scan_list, http_curl_scan)
 		} else if current_service.name == "microsoft-ds" {
-			smb_nmap_scan_args := []string{"-p", current_service.port, "--script=smb-enum-shares.nse,smb-ls.nse,smb-enum-users.nse,smb-mbenum.nse,smb-os-discovery.nse,smb-security-mode.nse,smbv2-enabled.nse,smb-vuln-cve2009-3103.nse,smb-vuln-ms06-025.nse,smb-vuln-ms07-029.nse,smb-vuln-ms08-067.nse,smb-vuln-ms10-054.nse,smb-vuln-ms10-061.nse,smb-vuln-regsvc-dos.nse,smbv2-enabled.nse", target}
+			smb_nmap_scan_args := []string{"-p", current_service.port, "--script=smb-enum-shares.nse,smb-ls.nse,smb-enum-users.nse,smb-mbenum.nse,smb-os-discovery.nse,smb-security-mode.nse,smb-vuln-cve2009-3103.nse,smb-vuln-ms06-025.nse,smb-vuln-ms07-029.nse,smb-vuln-ms08-067.nse,smb-vuln-ms10-054.nse,smb-vuln-ms10-061.nse,smb-vuln-regsvc-dos.nse", target}
 			smb_nmap_scan := scan{&sync.RWMutex{}, "os", "smb-nmap-scan", "nmap", smb_nmap_scan_args, "", "initialized", 0, false, "", current_service}
 			smb_enumlinux_scan_args := []string{"-a", target}
 			smb_enumlinux_scan := scan{&sync.RWMutex{}, "os", "smb-enumlinux-scan", "enum4linux", smb_enumlinux_scan_args, "", "initialized", 0, false, "", current_service}
