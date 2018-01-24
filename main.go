@@ -123,8 +123,7 @@ func cleanup(scans []scan) {
 		//	write the status to the main log file
 		//	write its results to its logfile
 		if current_scan.status != "complete" && current_scan.status != "error" {
-			current_time := time.Now()
-			scan_formatted := formatScan(&current_scan, current_time)
+			scan_formatted := formatScan(&current_scan)
 			scan_logfile_path := formatScanLogfile(current_scan)
 			log(logfile_path, scan_formatted)
 			log(scan_logfile_path, "[*] caught Ctl-C ... exiting")
@@ -217,12 +216,13 @@ func tabsFromNameLength(name string) int {
 }
 
 // format scan for output
-func formatScan(current_scan *scan, current_time time.Time) string {
+func formatScan(current_scan *scan) string {
 	status_character_idx := int(math.Floor(float64(iteration)/1)) % len(status_spin)
 	status_character := status_spin[status_character_idx]
 	number_of_tabs := tabsFromNameLength(current_scan.name)
 	port_padding := strings.Repeat("\t", number_of_tabs)
 	status_padding := "\t"
+	current_time := time.Now()
 	time_elapsed := current_time.Sub(current_scan.start_time).Seconds()
 	current_scan.elapsed = time_elapsed
 
@@ -275,8 +275,7 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 						log(scan_logfile_path, current_scan.results)
 					}
 					// log the finishes to main log file
-					current_time := time.Now()
-					to_write := formatScan(&current_scan, current_time)
+					to_write := formatScan(&current_scan)
 					log(logfile_path, to_write)
 					current_scan.logged = true
 				}
@@ -365,32 +364,19 @@ func outputProgress(scans []scan) {
 
 	// overwrite with updated scan results
 	for i := 0; i < len(scans); i++ {
-		status_character_idx := int(math.Floor(float64(iteration)/1)) % len(status_spin)
-		status_character := status_spin[status_character_idx]
-		status_title := scans[i].name
-		if scans[i].status == "complete" {
-			status_character = "+"
-		} else if scans[i].status == "error" {
-			status_character = "!"
-		}
-		number_of_tabs := tabsFromNameLength(scans[i].name)
-		port_tab_padding := strings.Repeat("\t", number_of_tabs)
-		status_tab_padding := "\t"
-		if scans[i].status == "error" {
-			status_tab_padding = "\t\t"
-		}
-		to_write := fmt.Sprintf("\t[%v] scan: %v%v[port:%v]\t(%v)%v[time elapsed: %.2fs]", status_character, status_title, port_tab_padding, scans[i].scan_service.port, scans[i].status, status_tab_padding, scans[i].elapsed)
-		scans[i].mutex.RLock()
-		if scans[i].status == "complete" {
+		current_scan := scans[i]
+		to_write := formatScan(&current_scan)
+		current_scan.mutex.RLock()
+		if current_scan.status == "complete" {
 			colorPrint(to_write, string_format.green, false, false)
-		} else if scans[i].status == "running" {
+		} else if current_scan.status == "running" {
 			colorPrint(to_write, string_format.yellow, false, false)
-		} else if scans[i].status == "error" {
+		} else if current_scan.status == "error" {
 			colorPrint(to_write, string_format.red, false, false)
 		} else {
 			colorPrint(to_write, string_format.blue, false, false)
 		}
-		scans[i].mutex.RUnlock()
+		current_scan.mutex.RUnlock()
 	}
 }
 
