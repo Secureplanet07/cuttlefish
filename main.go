@@ -271,14 +271,16 @@ func formatScan(current_scan *scan) string {
 	port_padding := strings.Repeat("\t", number_of_tabs)
 	status_padding := "\t"
 	current_time := time.Now()
-	time_elapsed := current_time.Sub(current_scan.start_time).Seconds()
-	current_scan.elapsed = time_elapsed
 
 	if current_scan.status == "error" {
 		status_padding = "\t\t"
 		status_character = "!"
 	} else if current_scan.status == "complete" {
 		status_character = "+"
+	} else {
+		// update the elapsed time
+		time_elapsed := current_time.Sub(current_scan.start_time).Seconds()
+		current_scan.elapsed = time_elapsed
 	}
 
 	formatted_scan := fmt.Sprintf("\t[%v] scan: %v%v[port:%v]\t(%v)%v[time elapsed: %.2fs]", 
