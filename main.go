@@ -27,6 +27,7 @@ var scan_start = time.Now()
 var term_width, _ = terminal.Width()
 var term_height, _ = terminal.Height()
 
+var iteration = 0
 var status_spin = []string{"\\","|","/","-"}
 
 // output log file
@@ -83,11 +84,13 @@ type scan struct {
 	logged bool
 	error_message string
 	scan_service *service
+	start_time time.Time
 }
 
 // struct to hold information about an id'd service
 type service struct {
 	name string
+	target string
 	port string
 	status string
 }
@@ -113,9 +116,23 @@ var string_format = struct {
 	underl: "\033[4m",
 }
 
-func cleanup() {
+func cleanup(scans []scan) {
+	for i := 0; i < len(scans); i++ {
+		current_scan := scans[i]
+		// if the scan was still running:
+		//	write the status to the main log file
+		//	write its results to its logfile
+		if current_scan.status != "complete" && current_scan.status != "error" {
+			current_time := time.Now()
+			scan_formatted := formatScan(&current_scan, current_time)
+			scan_logfile_path := formatScanLogfile(current_scan)
+			log(logfile_path, scan_formatted)
+			log(scan_logfile_path, "[*] caught Ctl-C ... exiting")
+			log(scan_logfile_path, current_scan.results)
+		}
+	}
 	colorPrint("\n[!] caught Ctl-C ... cleaning up\033c", string_format.yellow, logging, true)
-	os.Exit(1)
+	os.Exit(0)
 }
 
 func allSame(ints []int) bool {
@@ -199,70 +216,82 @@ func tabsFromNameLength(name string) int {
 	return tabs
 }
 
+// format scan for output
+func formatScan(current_scan *scan, current_time time.Time) string {
+	status_character_idx := int(math.Floor(float64(iteration)/1)) % len(status_spin)
+	status_character := status_spin[status_character_idx]
+	number_of_tabs := tabsFromNameLength(current_scan.name)
+	port_padding := strings.Repeat("\t", number_of_tabs)
+	status_padding := "\t"
+	time_elapsed := current_time.Sub(current_scan.start_time).Seconds()
+	current_scan.elapsed = time_elapsed
+
+	if current_scan.status == "error" {
+		status_padding = "\t\t"
+		status_character = "!"
+	} else if current_scan.status == "complete" {
+		status_character = "+"
+	}
+
+	formatted_scan := fmt.Sprintf("\t[%v] scan: %v%v[port:%v]\t(%v)%v[time elapsed: %.2fs]", 
+		status_character, current_scan.name, port_padding, current_scan.scan_service.port, 
+		current_scan.status, status_padding, current_scan.elapsed)
+
+	return formatted_scan
+}
+
+func formatScanLogfile(current_scan scan) string {
+	scan_logfile_name := fmt.Sprintf("%v-%v-[port:%v]-%v-.cuttlelog", 
+		current_scan.scan_service.target, current_scan.name, current_scan.scan_service.port, scan_start)
+	scan_logfile_path := filepath.Join(logfile_root_path, scan_logfile_name)
+	return scan_logfile_path
+}
+
 func scanProgress(scans []scan, target string, scan_channel chan bool) {
 	start_time := time.Now()
-	finished := 0
-	// log the starts
+	// initialize all scans with start_time of now
 	for i := 0; i < len(scans); i++ {
-		to_write := fmt.Sprintf("\t[*] scan: %v (%v) [time elapsed: %.2fs]", scans[i].name, scans[i].status, scans[i].elapsed)
-		if logging {
-			log(logfile_path, to_write)
-		}
+		current_scan := scans[i]
+		current_scan.start_time = start_time
 	}
-	iteration := 0
+	finished := 0
 	for 1 > finished {
 		iteration += 1
 		var completion_statuses []int
 		for i := 0; i < len(scans); i++ {
-			scans[i].mutex.RLock()
-			current_time := time.Now()
-			time_elapsed := current_time.Sub(start_time).Seconds()
-			if scans[i].status == "complete" || scans[i].status == "error" {
+			current_scan := scans[i]
+			current_scan.mutex.RLock()
+			if current_scan.status == "complete" || current_scan.status == "error" {
 				completion_statuses = append(completion_statuses, 1)
 				// gross..but prevents a logging:false, logged=true loop write
-				if logging && (scans[i].logged == false) {
-					number_of_tabs := tabsFromNameLength(scans[i].name)
-					port_padding := strings.Repeat("\t", number_of_tabs)
-
+				if logging && (current_scan.logged == false) {
 					// write our actual scan loot outputs to a log file
-					scan_logfile_name := fmt.Sprintf("%v-%v-[port:%v]-%v-.cuttlelog", target, scans[i].name, scans[i].scan_service.port, scan_start)
-					scan_logfile_path := filepath.Join(logfile_root_path, scan_logfile_name)
+					scan_logfile_path := formatScanLogfile(current_scan)
 					// log the error message if we error out
-					if scans[i].status == "error" {
-						if scans[i].scan_type == "cuttlefish" {
-							log(scan_logfile_path, scans[i].results)
-						} else {
-							log(scan_logfile_path, scans[i].error_message)
-						}
+					if current_scan.status == "error" {
+						// TODO: why we get cryptic error file output
+						log(scan_logfile_path, current_scan.error_message)
 					} else {
-						log(scan_logfile_path, scans[i].results)
+						log(scan_logfile_path, current_scan.results)
 					}
 					// log the finishes to main log file
-					status_padding := "\t"
-					if scans[i].status == "error" {
-						status_padding = "\t\t"
-					}
-					to_write := fmt.Sprintf("\t[+] scan: %v%v[port:%v]\t(%v)%v[time elapsed: %.2fs]", scans[i].name, port_padding, scans[i].scan_service.port, scans[i].status, status_padding, scans[i].elapsed)
-					if scans[i].status == "error" {
-						to_write = fmt.Sprintf("\t[!] scan: %v%v[port:%v]\t(%v)%v[time elapsed: %.2fs]", scans[i].name, port_padding, scans[i].scan_service.port, scans[i].status, status_padding, scans[i].elapsed)
-					}
-					
+					current_time := time.Now()
+					to_write := formatScan(&current_scan, current_time)
 					log(logfile_path, to_write)
-					scans[i].logged = true
+					current_scan.logged = true
 				}
 			} else {
-				scans[i].elapsed = time_elapsed
 				completion_statuses = append(completion_statuses, 0)
 			}
-			scans[i].mutex.RUnlock()
+			current_scan.mutex.RUnlock()
 		}
 		if allSame(completion_statuses) && completion_statuses[0] == 1 {
 			// print the final state
-			outputProgress(scans, iteration)
+			outputProgress(scans)
 			finished = 1
 
 		} else {
-			outputProgress(scans, iteration)
+			outputProgress(scans)
 			// without the sleep output gets nuts
 			time.Sleep(100000000)
 		}
@@ -308,7 +337,7 @@ func getTermPrintOffsets(scans []scan, previous_prints_array []previous_print) (
 	return start_index, num_prev_prints, output_height
 }
 
-func outputProgress(scans []scan, iteration int) {
+func outputProgress(scans []scan) {
 	// set these every time so that we can resize
 	term_width, _ = terminal.Width()
 	term_height, _ = terminal.Height()
@@ -366,7 +395,7 @@ func outputProgress(scans []scan, iteration int) {
 }
 
 // identifies both open and closed running services
-func identifyServices(nmap_output string) []service {
+func identifyServices(nmap_output string, target string) []service {
 	// grab '22/tcp' from the beginning of the line
 	var validService = regexp.MustCompile(`^(\d+/[a-z]+)\s+\w+\s+[A-z,a-z,0-9,-]+`)
 	// grab '  ssh  ' from the validated line
@@ -393,7 +422,7 @@ func identifyServices(nmap_output string) []service {
 			}
 			service_name = parsed_service_name_list[2]
 			service_status := parsed_service_name_list[1]
-			new_service := service{service_name, service_port, service_status}
+			new_service := service{service_name, target, service_port, service_status}
 
 			identified_services = append(identified_services, new_service)
 		}
@@ -488,21 +517,21 @@ func makeServiceScanList(target string, service_list []service) []scan {
 		// set up scans for identified services
 		if current_service.name == "ftp" {
 			ftp_nmap_scan_args := []string{"-sV", "-Pn", "-vv", "-p", current_service.port, "--script=ftp-anon,ftp-bounce,ftp-libopie,ftp-proftpd-backdoor,ftp-vsftpd-backdoor,ftp-vuln-cve2010-4221", target}
-			ftp_nmap_scan := scan{&sync.RWMutex{}, "os", "ftp-nmap-scan", "nmap", ftp_nmap_scan_args, "", "initialized", 0, false, "", current_service}
+			ftp_nmap_scan := scan{&sync.RWMutex{}, "os", "ftp-nmap-scan", "nmap", ftp_nmap_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
 			hydra_ftp_args := []string{"-L", hydra_default_user_wordlist, "-P", hydra_default_user_passlist, "-f", "-u", target, "-s", current_service.port, "ftp"}
-			hydra_ftp_scan := scan{&sync.RWMutex{}, "os", "hydra-ftp-brute", "hydra", hydra_ftp_args, "", "initialized", 0, false, "", current_service}
+			hydra_ftp_scan := scan{&sync.RWMutex{}, "os", "hydra-ftp-brute", "hydra", hydra_ftp_args, "", "initialized", 0, false, "", current_service, scan_start}
 			service_scan_list = append(service_scan_list, ftp_nmap_scan)
 			service_scan_list = append(service_scan_list, hydra_ftp_scan)
 		} else if current_service.name == "ssh" {
 			hydra_args := []string{"-L", hydra_default_user_wordlist, "-P", hydra_default_user_passlist, "-f", "-u", target, "-s", current_service.port, "ssh"}
-			hydra_scan := scan{&sync.RWMutex{}, "os", "hydra-ssh-brute", "hydra", hydra_args, "", "initialized", 0, false, "", current_service}
+			hydra_scan := scan{&sync.RWMutex{}, "os", "hydra-ssh-brute", "hydra", hydra_args, "", "initialized", 0, false, "", current_service, scan_start}
 			service_scan_list = append(service_scan_list, hydra_scan)
 		} else if current_service.name == "smtp" {
 			full_smtp_enum_script_path := filepath.Join(script_dir, "smtp-user-enum.pl")
-			smtp_user_enum_scan := scan{&sync.RWMutex{}, "os", "smtp-user-enum", full_smtp_enum_script_path, []string{"-U", smtp_default_namelist, "-t", target, "-p", current_service.port}, "", "initialized", 0, false, "", current_service}
+			smtp_user_enum_scan := scan{&sync.RWMutex{}, "os", "smtp-user-enum", full_smtp_enum_script_path, []string{"-U", smtp_default_namelist, "-t", target, "-p", current_service.port}, "", "initialized", 0, false, "", current_service, scan_start}
 			// https://github.com/xapax/oscp/blob/master/recon_enum/reconscan.py
 			smtp_nmap_scan_args := []string{"-sV", "-Pn", "-p", current_service.port, "--script=smtp-commands,smtp-enum-users,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720,smtp-vuln-cve2011-1764", target}
-			smtp_nmap_scan := scan{&sync.RWMutex{}, "os", "smtp-nmap-enum", "nmap", smtp_nmap_scan_args, "", "initialized", 0, false, "", current_service}
+			smtp_nmap_scan := scan{&sync.RWMutex{}, "os", "smtp-nmap-enum", "nmap", smtp_nmap_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
 			service_scan_list = append(service_scan_list, smtp_user_enum_scan)
 			service_scan_list = append(service_scan_list, smtp_nmap_scan)
 		} else if current_service.name == "snmp" {
@@ -514,32 +543,32 @@ func makeServiceScanList(target string, service_list []service) []scan {
 				url_target = fmt.Sprintf("https://%v", target)
 				// add sslscan scan
 				sslscan_arg := fmt.Sprintf("%v:%v", url_target, current_service.port)
-				sslscan_scan := scan{&sync.RWMutex{}, "os", "sslscan-scan", "sslscan", []string{sslscan_arg}, "", "initialized", 0, false, "", current_service}
+				sslscan_scan := scan{&sync.RWMutex{}, "os", "sslscan-scan", "sslscan", []string{sslscan_arg}, "", "initialized", 0, false, "", current_service, scan_start}
 				service_scan_list = append(service_scan_list, sslscan_scan)
 			}
 			gobuster_args := []string{"-u", url_target, "-w", gobuster_default_dirlist}
-			gobuster_scan := scan{&sync.RWMutex{}, "os", "gobuster-dir-enum", "gobuster", gobuster_args, "", "initialized", 0, false, "", current_service}
-			nikto_scan := scan{&sync.RWMutex{}, "os", "nikto-scan", "nikto", []string{"-h", url_target}, "", "initialized", 0, false, "", current_service}
+			gobuster_scan := scan{&sync.RWMutex{}, "os", "gobuster-dir-enum", "gobuster", gobuster_args, "", "initialized", 0, false, "", current_service, scan_start}
+			nikto_scan := scan{&sync.RWMutex{}, "os", "nikto-scan", "nikto", []string{"-h", url_target}, "", "initialized", 0, false, "", current_service, scan_start}
 			http_nmap_scan_args := []string{"-sV", "-Pn", "vv", "-p", current_service.port, "--script=http-vhosts,http-userdir-enum,http-apache-negotiation,http-backup-finder,http-config-backup,http-default-accounts,http-methods,http-method-tamper,http-passwd,http-robots.txt,http-devframework,http-enum,http-frontpage-login,http-git,http-iis-webdav-vuln,http-php-version,http-robots.txt,http-shellshock,http-vuln-cve2015-1635", target}
-			http_nmap_scan := scan{&sync.RWMutex{}, "os", "http-nmap-scan", "nmap", http_nmap_scan_args, "", "initialized", 0, false, "", current_service}
+			http_nmap_scan := scan{&sync.RWMutex{}, "os", "http-nmap-scan", "nmap", http_nmap_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
 			http_curl_scan_args := []string{"-I", url_target}
-			http_curl_scan := scan{&sync.RWMutex{}, "os", "http-curl-scan", "curl", http_curl_scan_args, "", "initialized", 0, false, "", current_service}
+			http_curl_scan := scan{&sync.RWMutex{}, "os", "http-curl-scan", "curl", http_curl_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
 			service_scan_list = append(service_scan_list, gobuster_scan)
 			service_scan_list = append(service_scan_list, nikto_scan)
 			service_scan_list = append(service_scan_list, http_nmap_scan)
 			service_scan_list = append(service_scan_list, http_curl_scan)
 		} else if current_service.name == "microsoft-ds" {
 			smb_nmap_scan_args := []string{"-p", current_service.port, "--script=smb-enum-shares,smb-ls,smb-enum-users,smb-mbenum,smb-os-discovery,smb-security-mode,smb-vuln-cve2009-3103,smb-vuln-ms06-025,smb-vuln-ms07-029,smb-vuln-ms08-067,smb-vuln-ms10-054,smb-vuln-ms10-061,smb-vuln-regsvc-dos", target}
-			smb_nmap_scan := scan{&sync.RWMutex{}, "os", "smb-nmap-scan", "nmap", smb_nmap_scan_args, "", "initialized", 0, false, "", current_service}
+			smb_nmap_scan := scan{&sync.RWMutex{}, "os", "smb-nmap-scan", "nmap", smb_nmap_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
 			smb_enumlinux_scan_args := []string{"-a", target}
-			smb_enumlinux_scan := scan{&sync.RWMutex{}, "os", "smb-enumlinux-scan", "enum4linux", smb_enumlinux_scan_args, "", "initialized", 0, false, "", current_service}
+			smb_enumlinux_scan := scan{&sync.RWMutex{}, "os", "smb-enumlinux-scan", "enum4linux", smb_enumlinux_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
 			service_scan_list = append(service_scan_list, smb_nmap_scan)
 			service_scan_list = append(service_scan_list, smb_enumlinux_scan)
 		} else if current_service.name == "ms-sql" {
 			// nmap -sV -Pn -p %s --script=ms-sql-info,ms-sql-config,ms-sql-dump-hashes --script-args=mssql.instance-port=1433,smsql.username-sa,mssql.password-sa
 			mssql_nmap_script_args := fmt.Sprintf("--script-args=mssql.instance-port=%v,smsql.username-sa,mssql.password-sa", current_service.port)
 			mssql_nmap_scan_args := []string{"-sV", "-Pn", "-p", current_service.port, "--script=ms-sql-info,ms-sql-config,ms-sql-dump-hashes", mssql_nmap_script_args, target}
-			mssql_nmap_scan := scan{&sync.RWMutex{}, "os", "mssql-nmap-scan", "nmap", mssql_nmap_scan_args, "", "initialized", 0, false, "", current_service}
+			mssql_nmap_scan := scan{&sync.RWMutex{}, "os", "mssql-nmap-scan", "nmap", mssql_nmap_scan_args, "", "initialized", 0, false, "", current_service, scan_start}
 			service_scan_list = append(service_scan_list, mssql_nmap_scan)
 		}
 	}
@@ -547,13 +576,15 @@ func makeServiceScanList(target string, service_list []service) []scan {
 }
 
 func main() {
-	// get her started
+	// initialize the scans so we can clean them up on exit Ctl-C
+	var scans []scan
+
 	// sig-term handler
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		cleanup()
+		cleanup(scans)
 		os.Exit(1)
 	}()
 
@@ -646,11 +677,9 @@ func main() {
 		}
 	}
 	
-	// initialize the scans
-	var scans []scan
-	spoof_service := service{"all", "all", "all"}
-	nmap_tcp_scan := scan{&sync.RWMutex{}, "os", "nmap-tcp-recon", "nmap", []string{}, "", "initialized", 0, false, "", &spoof_service}
-	nmap_udp_scan := scan{&sync.RWMutex{}, "os", "nmap-udp-recon", "nmap", []string{}, "", "initialized", 0, false, "", &spoof_service}
+	spoof_service := service{"all", *target, "all", "all"}
+	nmap_tcp_scan := scan{&sync.RWMutex{}, "os", "nmap-tcp-recon", "nmap", []string{}, "", "initialized", 0, false, "", &spoof_service, scan_start}
+	nmap_udp_scan := scan{&sync.RWMutex{}, "os", "nmap-udp-recon", "nmap", []string{}, "", "initialized", 0, false, "", &spoof_service, scan_start}
 	if os.Getuid() == 0 {
 		getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v), script scanning with nmap", os.Getuid())
 		colorPrint(getuid_string, string_format.green, logging, true)
@@ -680,9 +709,9 @@ func main() {
 	<-recon_scan_channel
 	
 	// now let's find services from the recon scan results
-	identified_services := identifyServices(scans[0].results)
+	identified_services := identifyServices(scans[0].results, *target)
 	if os.Getuid() == 0 {
-		identified_udp_services := identifyServices(scans[1].results)
+		identified_udp_services := identifyServices(scans[1].results, *target)
 		identified_services := append(identified_services, identified_udp_services...)
 		identified_services = removeDuplicateServices(identified_services)
 	}
