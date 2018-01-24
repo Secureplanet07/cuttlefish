@@ -22,6 +22,10 @@ import (
 ~~~~~~~ global structs and vars ~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
+
+// debug?
+var debug = false
+
 // start time (for log files)
 var scan_start = time.Now()
 var term_width, _ = terminal.Width()
@@ -31,7 +35,7 @@ var iteration = 0
 var status_spin = []string{"\\","|","/","-"}
 
 // output log file
-var logging = true
+var logging = false
 var logfile_root_path string
 var logfile_path string
 
@@ -114,17 +118,23 @@ var string_format = struct {
 }
 
 func cleanup(scans []scan) {
-	for i := 0; i < len(scans); i++ {
-		current_scan := scans[i]
-		// if the scan was still running:
-		//	write the status to the main log file
-		//	write its results to its logfile
-		if current_scan.status != "complete" && current_scan.status != "error" {
+	if !allScansComplete(scans) {
+		for i := 0; i < len(scans); i++ {
+			current_scan := scans[i]
+			// if any of the scans were still running, this means
+			// that the scan run was not complete and therefore
+			// would not be logged in the main log file
+
+			// the completed scans would have individual log files
+			// the running scans would have neither
+			
+			if current_scan.status == "running" {
+				scan_logfile_path := formatScanLogfile(current_scan)
+				log(scan_logfile_path, "[*] caught Ctl-C ... exiting")
+				log(scan_logfile_path, current_scan.results)
+			}
 			scan_formatted := formatScan(&current_scan)
-			scan_logfile_path := formatScanLogfile(current_scan)
 			log(logfile_path, scan_formatted)
-			log(scan_logfile_path, "[*] caught Ctl-C ... exiting")
-			log(scan_logfile_path, current_scan.results)
 		}
 	}
 	ctl_c_string := fmt.Sprintf("\n[!] caught Ctl-C ... cleaning up%v", string_format.end)
@@ -139,6 +149,22 @@ func allSame(ints []int) bool {
 		}
 	}
 	return true
+}
+
+func allScansComplete(scans []scan) bool {
+	var completion_statuses []int
+	for i := 0; i < len(scans); i++ {
+		current_scan := scans[i]
+		current_scan.mutex.RLock()
+		if current_scan.status == "complete" || current_scan.status == "error" {
+			completion_statuses = append(completion_statuses, 1)
+		} else {
+			completion_statuses = append(completion_statuses, 0)
+		}
+		current_scan.mutex.RUnlock()
+	}
+	all_same_bool := allSame(completion_statuses) && completion_statuses[0] == 1
+	return all_same_bool
 }
 
 func log(log_filepath string, message string) {
@@ -213,7 +239,7 @@ func scanPrint(scan_to_print scan, logging bool, tracking bool) {
 	} else {
 		scan_color = string_format.yellow
 	}
-	scan_color_formatted := fmt.Sprintf("%v%v%v", scan_color, scan_formatted, string_format.end)
+	scan_color_formatted := fmt.Sprintf("%v%v%v\n", scan_color, scan_formatted, string_format.end)
 	if tracking {
 		if logging {
 			log(logfile_path, scan_formatted)
@@ -309,14 +335,6 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 			time.Sleep(100000000)
 		}
 	}
-	// finally, print the result of all scans so that we count them in the total
-	// lines printed and they persist in the printed lines
-	for i := 0; i < len(scans); i++ {
-		current_scan := scans[i]
-		// log the finishes to main log file
-		scanPrint(current_scan, logging, true)
-		current_scan.logged = true
-	}
 	// update tracked prints for number of scans
 	scan_channel <- true
 }
@@ -325,7 +343,12 @@ func previousPrint(previous_print_instance previous_print) {
 	if previous_print_instance.print_color == "regular" {
 		regularPrint(previous_print_instance.print_string, false, false)
 	} else {
-		colorPrint(previous_print_instance.print_string, previous_print_instance.print_color, false, false)
+		colorPrint(
+			previous_print_instance.print_string, 
+			previous_print_instance.print_color, 
+			false, 
+			false,
+		)
 	}
 }
 
@@ -342,7 +365,7 @@ func getTermPrintOffsets(scans []scan, previous_prints_array []previous_print) (
 	if len(previous_prints) > (int(term_height) - 1) {
 		num_prev_prints = num_prev_prints - 1
 	}
-	last_index := len(previous_prints) - 1
+	last_index := len(previous_prints)
 	start_index := last_index - num_prev_prints
 	if start_index < 0 {
 		start_index = 0
@@ -377,7 +400,14 @@ func outputProgress(scans []scan) {
 	first_print_index, num_prev_prints_to_print, first_scan_print_height := getTermPrintOffsets(scans, previous_prints)
 	
 	for i:= 0; i < num_prev_prints_to_print; i++ {
-		previousPrint(previous_prints[i+first_print_index])
+		if debug {
+			reformatted_print := fmt.Sprintf("%v %v", i+first_print_index, previous_prints[i+first_print_index])
+			reformatted_prev_print := previous_prints[i+first_print_index]
+			reformatted_prev_print.print_string = reformatted_print
+			previousPrint(reformatted_prev_print)
+		} else {
+			previousPrint(previous_prints[i+first_print_index])
+		}
 	}
 	// write in all the active scans below the previous content
 	// this skips our write start to the height of the number of scans we have
