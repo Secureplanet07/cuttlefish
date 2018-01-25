@@ -227,8 +227,8 @@ func colorPrint(print_string string, color string, logging bool, tracking bool) 
 	fmt.Printf("%v%v%v\n", color, print_string, string_format.end)
 }
 
-func scanPrint(scan_to_print scan, logging bool, tracking bool) {
-	scan_formatted := formatScan(&scan_to_print)
+func scanPrint(scan_to_print *scan, logging bool, tracking bool) {
+	scan_formatted := formatScan(scan_to_print)
 	scan_color := ""
 	if scan_to_print.status == "complete" {
 		scan_color = string_format.green
@@ -467,7 +467,7 @@ func outputProgress(scans []scan) {
 
 	// overwrite with updated scan results
 	for i := 0; i < len(scans); i++ {
-		current_scan := scans[i]
+		current_scan := &scans[i]
 		current_scan.mutex.RLock()
 		scanPrint(current_scan, false, false)
 		current_scan.mutex.RUnlock()
