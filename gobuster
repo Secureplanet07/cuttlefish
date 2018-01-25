@@ -1,3 +1,21 @@
 #!/bin/bash
 
 sleep 2
+echo "
+Gobuster v1.3                OJ Reeves (@TheColonial)
+=====================================================
+[+] Mode         : dir
+[+] Url/Domain   : http://192.168.56.3/
+[+] Threads      : 10
+[+] Wordlist     : /Users/coastal/Documents/tools/SecLists/Discovery/Web_Content/raft-large-directories.txt
+[+] Status codes : 200,204,301,302,307
+=====================================================
+/test (Status: 301)
+/index (Status: 200)
+/phpMyAdmin (Status: 301)
+/twiki (Status: 301)
+/phpinfo (Status: 200)
+/dav (Status: 301)
+/tikiwiki (Status: 301)
+=====================================================
+"
