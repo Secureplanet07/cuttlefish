@@ -3,6 +3,3 @@ cuttlefish
 .DS_Store
 pkg
 src
-nmap
-gobuster
-hydra
