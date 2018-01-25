@@ -253,6 +253,19 @@ func scanPrint(scan_to_print scan, logging bool, tracking bool) {
 	fmt.Printf(scan_color_formatted)
 }
 
+func previousPrint(previous_print_instance previous_print) {
+	if previous_print_instance.print_color == "regular" {
+		regularPrint(previous_print_instance.print_string, false, false)
+	} else {
+		colorPrint(
+			previous_print_instance.print_string, 
+			previous_print_instance.print_color, 
+			false, 
+			false,
+		)
+	}
+}
+
 func tabsFromNameLength(name string) int {
 	max_len := 17
 	diff := math.Abs(float64(max_len) - float64(len(name)))
@@ -331,14 +344,15 @@ func addScansToPreviousPrints(scans []scan) {
 func updateScansAndReturnCompletionReport(scans []scan) []int {
 	var completion_statuses []int
 	for i := 0; i < len(scans); i++ {
-		current_scan := scans[i]
+		current_scan := &scans[i]
 		current_scan.mutex.RLock()
 		if current_scan.status == "complete" || current_scan.status == "error" {
 			completion_statuses = append(completion_statuses, 1)
 			// gross..but prevents a logging:false, logged=true loop write
 			if logging && (current_scan.logged == false) {
+				current_scan.logged = true
 				// write our actual scan loot outputs to a log file
-				scan_logfile_path := formatScanLogfile(current_scan)
+				scan_logfile_path := formatScanLogfile(*current_scan)
 				// log the error message if we error out
 				if current_scan.status == "error" {
 					// TODO: why we get cryptic error file output
@@ -388,19 +402,6 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 	}
 	// update tracked prints for number of scans
 	scan_channel <- true
-}
-
-func previousPrint(previous_print_instance previous_print) {
-	if previous_print_instance.print_color == "regular" {
-		regularPrint(previous_print_instance.print_string, false, false)
-	} else {
-		colorPrint(
-			previous_print_instance.print_string, 
-			previous_print_instance.print_color, 
-			false, 
-			false,
-		)
-	}
 }
 
 // returns the terminal y-axis coordinates for formatting print locations
@@ -468,7 +469,7 @@ func outputProgress(scans []scan) {
 	for i := 0; i < len(scans); i++ {
 		current_scan := scans[i]
 		current_scan.mutex.RLock()
-		scanPrint(current_scan, logging, false)
+		scanPrint(current_scan, false, false)
 		current_scan.mutex.RUnlock()
 	}
 }
@@ -539,15 +540,17 @@ func performScan(target string, scan_to_perform *scan) {
 		out, err = exec.Command(scan_to_perform.command, scan_to_perform.args...).Output()
 		
 		if err != nil {
-		error_string := fmt.Sprintf("%v:%v", 
+			error_string := fmt.Sprintf("%v:%v", 
 			scan_to_perform.name, err)
-		error_log_string := fmt.Sprintf("[!] error running (%v)\n\t%v", 
+			/*
+			error_log_string := fmt.Sprintf("[!] error running (%v)\n\t%v", 
 			scan_to_perform.name, err)
-		if logging {
-			log(logfile_path, error_log_string)
-		}
-		scan_to_perform.status = "error"
-		scan_to_perform.error_message = error_string
+			if logging {
+				log(logfile_path, error_log_string)
+			}
+			//*/
+			scan_to_perform.status = "error"
+			scan_to_perform.error_message = error_string
 		}
 	}
 	
