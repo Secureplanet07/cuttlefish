@@ -326,11 +326,10 @@ func formatScan(current_scan *scan) string {
 }
 
 func formatScanLogfile(current_scan scan) string {
-	scan_logfile_name := fmt.Sprintf("%v-%v-[port:%v]-%v-.cuttlelog", 
-		current_scan.scan_service.target, 
-		current_scan.name, 
-		current_scan.scan_service.port, 
-		scan_start,
+	scan_logfile_name := fmt.Sprintf("%v-port%v-%v.cuttlelog", 
+		current_scan.scan_service.target,
+		current_scan.scan_service.port,
+		current_scan.name,
 	)
 	scan_logfile_path := filepath.Join(logfile_root_path, scan_logfile_name)
 	return scan_logfile_path
@@ -1025,9 +1024,10 @@ func main() {
 	flag.Parse()
 
 	// set up the log file path
-	cuttletarget_dir := fmt.Sprintf("%v-cuttlefish-enum", *target)
+	time_string := fmt.Sprintf("%v", scan_start.Format(time.RFC3339))
+	cuttletarget_dir := fmt.Sprintf("%v-cuttlefish-enum/%v", *target, time_string)
 	logfile_root_path = filepath.Join(*output_path, cuttletarget_dir)
-	logfile_name := fmt.Sprintf("%v-cuttlemain-%v-.cuttlelog", *target, scan_start)
+	logfile_name := fmt.Sprintf("%v-cuttlemain.cuttlelog", *target)
 	logfile_path = filepath.Join(logfile_root_path, logfile_name)
 
 	// create the file directory if we are logging
