@@ -375,6 +375,8 @@ func updateScansAndReturnCompletionReport(scans []scan) []int {
 				} else {
 					log(scan_logfile_path, current_scan.results)
 				}
+				// log the completion in the main logfile
+				log(logfile_path, formatScan(current_scan))
 			}
 		} else {
 			completion_statuses = append(completion_statuses, 0)
@@ -548,7 +550,6 @@ func removeDuplicateServices(service_list []service) []service {
 	return unique_services
 }
 // performs a scan for a passed command
-// command is an array of strings
 func performScan(target string, scan_to_perform *scan) {
 	scan_to_perform.mutex.RLock()
 	scan_to_perform.status = "running"
@@ -563,13 +564,6 @@ func performScan(target string, scan_to_perform *scan) {
 		if err != nil {
 			error_string := fmt.Sprintf("%v:%v", 
 			scan_to_perform.name, err)
-			/*
-			error_log_string := fmt.Sprintf("[!] error running (%v)\n\t%v", 
-			scan_to_perform.name, err)
-			if logging {
-				log(logfile_path, error_log_string)
-			}
-			//*/
 			scan_to_perform.status = "error"
 			scan_to_perform.error_message = error_string
 		}
