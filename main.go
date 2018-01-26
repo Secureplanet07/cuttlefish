@@ -50,12 +50,14 @@ var hydra_default_user_wordlist = 	"/root/Documents/tools/SecLists/Usernames/top
 var hydra_default_user_passlist = 	"/root/Documents/tools/SecLists/Passwords/best1050.txt"
 var gobuster_default_dirlist = 		"/root/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
 var gobuster_default_filelist = 	"/root/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt"
+var gobuster_default_cgilist = 		"/root/Documents/tools/SecLists/Discovery/Web_Content/cgis.txt"
 var smtp_default_namelist = 		"/root/Documents/tools/SecLists/Usernames/top_shortlist.txt"
 /*
 var hydra_default_user_wordlist = 	"/Users/coastal//Documents/tools/SecLists/Usernames/top_shortlist.txt"
 var hydra_default_user_passlist = 	"/Users/coastal/Documents/tools/SecLists/Passwords/best1050.txt"
 var gobuster_default_dirlist = 		"/Users/coastal/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
 var gobuster_default_filelist = 	"/Users/coastal/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt"
+var gobuster_default_cgilist =		"/Users/coastal/Documents/tools/SecLists/Discovery/Web_Content/cgis.txt"
 var smtp_default_namelist = 		"/Users/coastal/Documents/tools/SecLists/Usernames/top_shortlist.txt"
 //*/
 
@@ -679,6 +681,22 @@ func addSSHScansToList(service_scan_list []scan, current_service *service) []sca
 	return service_scan_list
 }
 
+func addTelnetScansToList(service_scan_list []scan, current_service *service) []scan {
+	banner_grab_args := []string{
+		"-nvv",
+		current_service.target,
+		current_service.port,
+	}
+	banner_grab_scan := createOSServiceScan(
+		current_service,
+		"telnet-banner",
+		"nc",
+		banner_grab_args,
+	)
+	service_scan_list = append(service_scan_list, banner_grab_scan)
+	return service_scan_list
+}
+
 func addSMTPScansToList(service_scan_list []scan, current_service *service) []scan {
 	full_smtp_enum_script_path := filepath.Join(script_dir, "smtp-user-enum.pl")
 	smtp_user_enum_scan_args := []string{
@@ -702,7 +720,8 @@ func addSMTPScansToList(service_scan_list []scan, current_service *service) []sc
 		"-p", 
 		current_service.port, 
 		"--script=smtp-commands,smtp-enum-users,smtp-vuln-cve2010-4344,s" +
-		"mtp-vuln-cve2011-1720,smtp-vuln-cve2011-1764", 
+		"mtp-vuln-cve2011-1720,smtp-vuln-cve2011-1764,smtp-brute,smtp-nt" +
+		"lm-info,smtp-open-relay",
 		current_service.target,
 	}
 	smtp_nmap_scan := createOSServiceScan(
@@ -713,6 +732,45 @@ func addSMTPScansToList(service_scan_list []scan, current_service *service) []sc
 	)
 	service_scan_list = append(service_scan_list, smtp_user_enum_scan)
 	service_scan_list = append(service_scan_list, smtp_nmap_scan)
+	return service_scan_list
+}
+
+func addSNMPScansToList(service_scan_list []scan, current_service *service) []scan {
+	nmap_snmp_args := []string{
+		"-sV",
+		"-Pn",
+		"-vv",
+		"-p",
+		current_service.port,
+		"--script=snmp-netstat,snmp-processes",
+	}
+	nmap_snmp_scan := createOSServiceScan(
+		current_service,
+		"snpm-nmap-enum",
+		"nmap",
+		nmap_snmp_args,
+	)
+	onesixtyone_scan := createOSServiceScan(
+		current_service,
+		"snmp-161-enum",
+		"onesixtyone",
+		[]string{current_service.target},
+	)
+	snmpwalk_args := []string{
+		"-c",
+		"public",
+		"v1",
+		current_service.target,
+	}
+	snmpwalk_scan := createOSServiceScan(
+		current_service,
+		"snmpwalk-scan",
+		"snmpwalk",
+		snmpwalk_args,
+	)
+	service_scan_list = append(service_scan_list, nmap_snmp_scan)
+	service_scan_list = append(service_scan_list, onesixtyone_scan)
+	service_scan_list = append(service_scan_list, snmpwalk_scan)
 	return service_scan_list
 }
 
@@ -736,17 +794,29 @@ func addHTTPScansToList(service_scan_list []scan, current_service *service) []sc
 		)
 		service_scan_list = append(service_scan_list, sslscan_scan)
 	}
-	gobuster_args := []string{
+	gobuster_dir_args := []string{
 		"-u", 
 		url_target, 
 		"-w", 
 		gobuster_default_dirlist,
 	}
-	gobuster_scan := createOSServiceScan(
+	gobuster_dir_scan := createOSServiceScan(
 		current_service,
 		"gobuster-dir-enum", 
 		"gobuster", 
-		gobuster_args,
+		gobuster_dir_args,
+	)
+	gobuster_cgi_args := []string{
+		"-u", 
+		url_target, 
+		"-w", 
+		gobuster_default_cgilist,
+	}
+	gobuster_cgi_scan := createOSServiceScan(
+		current_service,
+		"gobuster-dir-enum", 
+		"gobuster", 
+		gobuster_cgi_args,
 	)
 	nikto_scan := createOSServiceScan(
 		current_service,
@@ -781,28 +851,49 @@ func addHTTPScansToList(service_scan_list []scan, current_service *service) []sc
 		"curl",
 		http_curl_scan_args,
 	)
-	service_scan_list = append(service_scan_list, gobuster_scan)
+	robots_txt_scan_target := fmt.Sprintf("%v/robots.txt", url_target)
+	robots_txt_scan := createOSServiceScan(
+		current_service,
+		"robots-txt-scan",
+		"curl",
+		[]string{robots_txt_scan_target},
+	)
+	service_scan_list = append(service_scan_list, gobuster_dir_scan)
+	service_scan_list = append(service_scan_list, gobuster_cgi_scan)
 	service_scan_list = append(service_scan_list, nikto_scan)
 	service_scan_list = append(service_scan_list, http_nmap_scan)
 	service_scan_list = append(service_scan_list, http_curl_scan)
+	service_scan_list = append(service_scan_list, robots_txt_scan)
 	return service_scan_list
 }
 
 func addSMBScansToList(service_scan_list []scan, current_service *service) []scan {
-	smb_nmap_scan_args := []string{
+	ports_arg := fmt.Sprintf("139,%v", current_service.port)
+	smb_nmap_vuln_scan_args := []string{
+		"-p", 
+		ports_arg, 
+		"--script=smb-vuln-*",
+		"--scriptargs=unsafe=1",
+		current_service.target,
+	}
+	smb_nmap_vuln_scan := createOSServiceScan(
+		current_service,
+		"smb-nmap-vuln",
+		"nmap",
+		smb_nmap_vuln_scan_args,
+	)
+	smb_nmap_enum_scan_args := []string{
 		"-p", 
 		current_service.port, 
 		"--script=smb-enum-shares,smb-ls,smb-enum-users,smb-mbenum,smb-o" +
-		"s-discovery,smb-security-mode,smb-vuln-cve2009-3103,smb-vuln-ms" +
-		"06-025,smb-vuln-ms07-029,smb-vuln-ms08-067,smb-vuln-ms10-054,sm" +
-		"b-vuln-ms10-061,smb-vuln-regsvc-dos", 
+		"s-discovery,smb-security-mode", 
 		current_service.target,
 	}
-	smb_nmap_scan := createOSServiceScan(
+	smb_nmap_enum_scan := createOSServiceScan(
 		current_service,
-		"smb-nmap-scan",
+		"smb-nmap-enum",
 		"nmap",
-		smb_nmap_scan_args,
+		smb_nmap_enum_scan_args,
 	)
 	smb_enumlinux_scan_args := []string{"-a", current_service.target}
 	smb_enumlinux_scan := createOSServiceScan(
@@ -811,10 +902,12 @@ func addSMBScansToList(service_scan_list []scan, current_service *service) []sca
 		"enum4linux",
 		smb_enumlinux_scan_args,
 	)
-	service_scan_list = append(service_scan_list, smb_nmap_scan)
+	service_scan_list = append(service_scan_list, smb_nmap_vuln_scan)
+	service_scan_list = append(service_scan_list, smb_nmap_enum_scan)
 	service_scan_list = append(service_scan_list, smb_enumlinux_scan)
 	return service_scan_list
 }
+
 func addMSSQLScansToList(service_scan_list []scan, current_service *service) []scan {
 	mssql_nmap_script_args := fmt.Sprintf("--script-args=mssql.instance-port=%v,smsql.username-sa,mssql.password-sa", current_service.port)
 	mssql_nmap_scan_args := []string{
@@ -836,6 +929,28 @@ func addMSSQLScansToList(service_scan_list []scan, current_service *service) []s
 	return service_scan_list
 }
 
+func addRDPScansToList(service_scan_list []scan, current_service *service) []scan {
+	rdp_scan_args := []string{
+		"-l", 
+		"administrator", 
+		"-P", 
+		hydra_default_user_passlist,
+		"-f",
+		"-u",
+		current_service.target, 
+		"-s", 
+		current_service.port, 
+		"rdp",
+	}
+	rdp_scan := createOSServiceScan(
+		current_service,
+		"hydra-rdp-brute",
+		"hydra",
+		rdp_scan_args,
+	)
+	service_scan_list = append(service_scan_list, rdp_scan)
+	return service_scan_list
+}
 
 // TODO: transforms a list of services into a list of scans
 // converts services identified by nmap output into `scan` structs for
@@ -860,10 +975,12 @@ func makeServiceScanList(service_list []service) []scan {
 			service_scan_list = addFTPScansToList(service_scan_list, current_service)
 		} else if current_service.name == "ssh" {
 			service_scan_list = addSSHScansToList(service_scan_list, current_service)
+		} else if current_service.name == "telnet" {
+			service_scan_list = addTelnetScansToList(service_scan_list, current_service)
 		} else if current_service.name == "smtp" {
 			service_scan_list = addSMTPScansToList(service_scan_list, current_service)
 		} else if current_service.name == "snmp" {
-			// add snmp scans here
+			service_scan_list = addSNMPScansToList(service_scan_list, current_service)
 		} else if current_service.name == "domain" {
 			// add domain scans here
 		} else if current_service.name == "http" || current_service.name == "ssl/http" || 
@@ -873,6 +990,8 @@ func makeServiceScanList(service_list []service) []scan {
 			service_scan_list = addSMBScansToList(service_scan_list, current_service)
 		} else if current_service.name == "ms-sql" {
 			service_scan_list = addMSSQLScansToList(service_scan_list, current_service)
+		} else if current_service.name == "msdrdp" || current_service.name == "ms-wbt-server" {
+			service_scan_list = addRDPScansToList(service_scan_list, current_service)
 		}
 	}
 	return service_scan_list

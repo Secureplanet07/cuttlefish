@@ -23,4 +23,6 @@ go build
 echo "[*] linking to /usr/local/bin"
 export PATH="$PATH:/usr/local/bin"
 ln -s $(pwd)/cuttlefish /usr/local/bin/cuttlefish 
+echo "[*] installing non-distro tools"
+apt-get install gobuster
 echo "[+] installation complete!"
