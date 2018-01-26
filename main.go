@@ -7,6 +7,7 @@ import (
 	"math"
 	"sync"
 	"time"
+	"bytes"
 	"regexp"
 	"strings"
 	"syscall"
@@ -276,6 +277,19 @@ func tabsFromNameLength(name string) int {
 	return tabs
 }
 
+// produces string of command + args that was passed to the 
+// command line from a scan struct
+func scanAsCommandLine(current_scan *scan) string {
+	command_string := bytes.Buffer{}
+	command_string.WriteString(current_scan.command)
+	command_string.WriteString(" ")
+	for i := 0; i < len(current_scan.args); i++ {
+		to_write := fmt.Sprintf("%v ", current_scan.args[i])
+		command_string.WriteString(to_write)
+	}
+	return command_string.String()
+}
+
 // format scan for output
 func formatScan(current_scan *scan) string {
 	status_character_idx := int(math.Floor(float64(iteration)/1)) % len(status_spin)
@@ -356,8 +370,14 @@ func updateScansAndReturnCompletionReport(scans []scan) []int {
 				// log the error message if we error out
 				if current_scan.status == "error" {
 					// TODO: why we get cryptic error file output
+					command_string := scanAsCommandLine(current_scan)
+					command_string = fmt.Sprintf("[*] running command: %v", command_string)
+					log(scan_logfile_path, command_string)
 					log(scan_logfile_path, current_scan.error_message)
 				} else {
+					command_string := scanAsCommandLine(current_scan)
+					command_string = fmt.Sprintf("[*] running command: %v", command_string)
+					log(scan_logfile_path, command_string)
 					log(scan_logfile_path, current_scan.results)
 				}
 			}
