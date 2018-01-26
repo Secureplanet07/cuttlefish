@@ -742,7 +742,9 @@ func addSNMPScansToList(service_scan_list []scan, current_service *service) []sc
 		"-vv",
 		"-p",
 		current_service.port,
-		"--script=snmp-netstat,snmp-processes",
+		"--script=snmp-netstat,snmp-processes,snmp-brute,snmp-info," +
+		"snmp-interfaces,snmp-sysdescr,snmp-win32-services,snmp-win32-shares," +
+		"snmp-win32-software,snmp-win32-users,snmp-ios-config,snmp-hh3c-logins",
 	}
 	nmap_snmp_scan := createOSServiceScan(
 		current_service,
