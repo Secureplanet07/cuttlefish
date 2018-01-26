@@ -868,7 +868,6 @@ func addSMBScansToList(service_scan_list []scan, current_service *service) []sca
 		"-p", 
 		ports_arg, 
 		"--script=smb-vuln-*",
-		"--scriptargs=unsafe=1",
 		current_service.target,
 	}
 	smb_nmap_vuln_scan := createOSServiceScan(
