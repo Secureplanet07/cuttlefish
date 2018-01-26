@@ -1085,7 +1085,7 @@ func main() {
 		if !strings.Contains(current_path, current_location) {
 			colorPrint("[!] testing requires preceeding PATH with the cuttlefish dir", string_format.red, logging, true)
 			colorPrint("\t[*] alter the PATH variable so that cuttlefish dir has priority", string_format.red, logging, true)
-			colorPrint("\t[*] command: `export PATH=$(pwd):$PATH`", string_format.red, logging, true)
+			colorPrint("\t[*] command: `export PATH=$(pwd)/fakebins:$PATH`", string_format.red, logging, true)
 			os.Exit(0)
 		}
 	} else {
@@ -1093,10 +1093,13 @@ func main() {
 		// the real binaries
 		current_path := os.Getenv("PATH")
 		current_location,_ := filepath.Abs(filepath.Dir(os.Args[0]))
+		fakebins_location := fmt.Sprintf("%v/fakebins", current_location)
 		if strings.Contains(current_path, current_location) {
+			fixed_path := strings.Replace(current_path, fakebins_location, "", 5)
+			fix_command := fmt.Sprintf("\t[*] command 2: `export PATH=%v`", fixed_path)
 			colorPrint("[!] fix PATH to remove cuttlefish dir", string_format.red, logging, true)
 			regularPrint("\t[*] command 1: `echo $PATH`", logging, true)
-			regularPrint("\t[*] command 2: `export PATH=<copy paste of PATH without cwd>`", logging, true)
+			regularPrint(fix_command, logging, true)
 			os.Exit(0)
 		}
 	}
