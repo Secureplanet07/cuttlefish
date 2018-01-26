@@ -139,7 +139,7 @@ func cleanup(scans []scan) {
 	}
 	ctl_c_string := fmt.Sprintf("\n[!] caught Ctl-C ... cleaning up%v", string_format.end)
 	colorPrint(ctl_c_string, string_format.yellow, logging, true)
-	os.Exit(0)
+	os.Exit(1)
 }
 
 func allSame(ints []int) bool {
