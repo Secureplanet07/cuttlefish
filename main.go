@@ -124,20 +124,17 @@ func cleanup(scans []scan) {
 	if !allScansComplete(scans) {
 		for i := 0; i < len(scans); i++ {
 			current_scan := scans[i]
-			// if any of the scans were still running, this means
-			// that the scan run was not complete and therefore
-			// would not be logged in the main log file
-
 			// the completed scans would have individual log files
+			// 		and main logged files
 			// the running scans would have neither
 			
-			if current_scan.status == "running" {
+			if !current_scan.logged {
 				scan_logfile_path := formatScanLogfile(current_scan)
 				log(scan_logfile_path, "[*] caught Ctl-C ... exiting")
 				log(scan_logfile_path, current_scan.results)
+				scan_formatted := formatScan(&current_scan)
+				log(logfile_path, scan_formatted)
 			}
-			scan_formatted := formatScan(&current_scan)
-			log(logfile_path, scan_formatted)
 		}
 	}
 	ctl_c_string := fmt.Sprintf("\n[!] caught Ctl-C ... cleaning up%v", string_format.end)
