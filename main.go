@@ -44,22 +44,17 @@ var logfile_path string
 var working_dir,_ = os.Getwd()
 var script_dir = filepath.Join(working_dir, "scripts")
 
+// user info
+var current_user, _ = user.Current()
+var user_homedir = current_user.HomeDir
+
 // arguments to scans
-//
-var hydra_default_user_wordlist = 	"/root/Documents/tools/SecLists/Usernames/top_shortlist.txt"
-var hydra_default_user_passlist = 	"/root/Documents/tools/SecLists/Passwords/best1050.txt"
-var gobuster_default_dirlist = 		"/root/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
-var gobuster_default_filelist = 	"/root/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt"
-var gobuster_default_cgilist = 		"/root/Documents/tools/SecLists/Discovery/Web_Content/cgis.txt"
-var smtp_default_namelist = 		"/root/Documents/tools/SecLists/Usernames/top_shortlist.txt"
-/*
-var hydra_default_user_wordlist = 	"/Users/coastal//Documents/tools/SecLists/Usernames/top_shortlist.txt"
-var hydra_default_user_passlist = 	"/Users/coastal/Documents/tools/SecLists/Passwords/best1050.txt"
-var gobuster_default_dirlist = 		"/Users/coastal/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt"
-var gobuster_default_filelist = 	"/Users/coastal/Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt"
-var gobuster_default_cgilist =		"/Users/coastal/Documents/tools/SecLists/Discovery/Web_Content/cgis.txt"
-var smtp_default_namelist = 		"/Users/coastal/Documents/tools/SecLists/Usernames/top_shortlist.txt"
-//*/
+var hydra_default_user_wordlist = 	filepath.Join(user_homedir, "tools/SecLists/Usernames/top_shortlist.txt")
+var hydra_default_user_passlist = 	filepath.Join(user_homedir, "tools/SecLists/Passwords/best1050.txt")
+var gobuster_default_dirlist = 		filepath.Join(user_homedir, "tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt")
+var gobuster_default_filelist = 	filepath.Join(user_homedir, "tools/SecLists/Discovery/Web_Content/raft-medium-files.txt")
+var gobuster_default_cgilist = 		filepath.Join(user_homedir, "tools/SecLists/Discovery/Web_Content/cgis.txt")
+var smtp_default_namelist = 		filepath.Join(user_homedir, "tools/SecLists/Usernames/top_shortlist.txt")
 
 // stuff to keep track of the prints so we can update the terminal ouput
 // properly when we print past the end of the terminal
@@ -1001,15 +996,12 @@ func main() {
 		os.Exit(1)
 	}()
 
-	// get home download dir for logging
-	usr, _ := user.Current()
-	dir := usr.HomeDir
-	default_log_dir := filepath.Join(dir, "Downloads")
+	// create the default logfile directory from initialized globals
+	default_log_dir := filepath.Join(user_homedir, "Documents/oscp/labs")
 
 	// parse out the flags passed
 	target		:= flag.String("target", "d34db33f", "IP address of target machine")
-	tentacles 	:= flag.Int("tentacles", 0, "number of AWS 'tentacles' (default=0)")
-	output_path	:= flag.String("logfile", default_log_dir, "location of output log file")
+	output_path	:= flag.String("logdir", default_log_dir, "location of output log file")
 	testing		:= flag.Bool("testing", false, "use test executables for enum output")
 	flag.Parse()
 
@@ -1058,13 +1050,9 @@ func main() {
 		colorPrint("[!] specify a target with '-target=TARGET_IP'", string_format.red, logging, true)
 		os.Exit(0)
 	}
-	if *tentacles > 0 {
-		colorPrint("[!] aws tentacles are not implemented", string_format.red, logging, true)
-		os.Exit(0)
-	}
 	// runmode summary
 	opt_1 := fmt.Sprintf("[*] run options")
-	logfile_path_string := fmt.Sprintf("\t[*] logging to %v", logfile_root_path)
+	logfile_path_string := fmt.Sprintf("\t[*] logging to %v", *output_path)
 	opt_2 := fmt.Sprintf("\t[*] target:\t\t%v", *target)
 	regularPrint(opt_1, logging, true)
 	if logging {

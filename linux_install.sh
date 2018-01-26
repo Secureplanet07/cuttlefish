@@ -25,4 +25,8 @@ export PATH="$PATH:/usr/local/bin"
 ln -s $(pwd)/cuttlefish /usr/local/bin/cuttlefish 
 echo "[*] installing non-distro tools"
 apt-get install gobuster
+echo "[*] downloading SecLists to ~/Documents/tools/"
+mkdir ~/Documents/tools
+cd ~/Documents/tools
+git clone https://github.com/danielmiessler/SecLists
 echo "[+] installation complete!"
