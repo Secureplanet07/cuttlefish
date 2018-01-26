@@ -371,14 +371,8 @@ func updateScansAndReturnCompletionReport(scans []scan) []int {
 				// log the error message if we error out
 				if current_scan.status == "error" {
 					// TODO: why we get cryptic error file output
-					command_string := scanAsCommandLine(current_scan)
-					command_string = fmt.Sprintf("[*] running command: %v", command_string)
-					log(scan_logfile_path, command_string)
 					log(scan_logfile_path, current_scan.error_message)
 				} else {
-					command_string := scanAsCommandLine(current_scan)
-					command_string = fmt.Sprintf("[*] running command: %v", command_string)
-					log(scan_logfile_path, command_string)
 					log(scan_logfile_path, current_scan.results)
 				}
 			}
@@ -393,9 +387,15 @@ func updateScansAndReturnCompletionReport(scans []scan) []int {
 func scanProgress(scans []scan, target string, scan_channel chan bool) {
 	start_time := time.Now()
 	// initialize all scans with start_time of now
+	// initialize all the logfiles with the command run (prevents an
+	// 		issue when the run is cut short with Ctl-C)
 	for i := 0; i < len(scans); i++ {
-		current_scan := scans[i]
+		current_scan := &scans[i]
 		current_scan.start_time = start_time
+		command_string := scanAsCommandLine(current_scan)
+		command_string = fmt.Sprintf("[*] running command: %v", command_string)
+		scan_logfile_path := formatScanLogfile(*current_scan)
+		log(scan_logfile_path, command_string)
 	}
 	finished := 0
 	for 1 > finished {
@@ -815,7 +815,7 @@ func addHTTPScansToList(service_scan_list []scan, current_service *service) []sc
 	}
 	gobuster_cgi_scan := createOSServiceScan(
 		current_service,
-		"gobuster-dir-enum", 
+		"gobuster-cgi-enum", 
 		"gobuster", 
 		gobuster_cgi_args,
 	)
