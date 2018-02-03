@@ -997,7 +997,7 @@ func main() {
 	}()
 
 	// create the default logfile directory from initialized globals
-	default_log_dir := filepath.Join(user_homedir, "Documents/oscp/labs")
+	default_log_dir := "/mnt/hgfs/shared/"
 
 	// parse out the flags passed
 	target		:= flag.String("target", "d34db33f", "IP address of target machine")
