@@ -36,7 +36,7 @@ var iteration = 0
 var status_spin = []string{"\\","|","/","-"}
 
 // output log file
-var logging = true
+var logging = false
 var logfile_root_path string
 var logfile_path string
 
@@ -1124,6 +1124,7 @@ func main() {
 			udp_string := fmt.Sprintf("\t[+] UDP scanning with nmap (-udp=True)")
 			colorPrint(getuid_string, string_format.green, logging, true)
 			colorPrint(udp_string, string_format.green, logging, true)
+			scans = append(scans, nmap_udp_scan)
 		} else {
 			getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
 			udp_string := fmt.Sprintf("\t[!] UDP scanning not performed (-udp=False)")
@@ -1132,7 +1133,7 @@ func main() {
 		}
 		
 		scans = append(scans, nmap_tcp_scan)
-		scans = append(scans, nmap_udp_scan)
+		
 	} else {
 		getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), UDP scanning not performed", os.Getuid())
 		colorPrint(getuid_string, string_format.yellow, logging, true)
