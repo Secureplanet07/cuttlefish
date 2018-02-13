@@ -1124,8 +1124,10 @@ func main() {
 		nmap_stub_scan.args = []string{"1"}
 		scans = append(scans, nmap_stub_scan)
 		if *udp {
-			
+			//
 		}
+		scan_len := fmt.Sprintf("[*] len scans: %v", len(scans))
+		regularPrint(scan_len, logging, true)
 	}
 	/*
 	if os.Getuid() == 0 {
@@ -1165,7 +1167,7 @@ func main() {
 	
 	// now let's find services from the recon scan results
 	identified_services := identifyServices(scans[0].results, *target)
-	if os.Getuid() == 0 {
+	if os.Getuid() == 0 && len(scans) > 1 {
 		identified_udp_services := identifyServices(scans[1].results, *target)
 		identified_services := append(identified_services, identified_udp_services...)
 		identified_services = removeDuplicateServices(identified_services)
