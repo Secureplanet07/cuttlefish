@@ -1101,7 +1101,7 @@ func main() {
 	nmap_tcp_scan.args = []string{}
 	nmap_udp_scan.args = []string{}
 	if *scan_level == 1 {
-		nmap_tcp_scan.args = []string{"-vv", "-Pn", "localhost"}
+		nmap_tcp_scan.args = []string{"-vv", "-Pn", *target}
 		nmap_udp_scan.args = []string{"-vv", "-Pn", "-sU", *target}
 	} else if *scan_level == 2 {
 		nmap_tcp_scan.args = []string{"-vv", "-Pn", "--top-ports", "2000", *target}
