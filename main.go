@@ -1123,6 +1123,9 @@ func main() {
 		nmap_stub_scan := createOSServiceScan(spoof_service, "stub-scan", "sleep", []string{})
 		nmap_stub_scan.args = []string{"1"}
 		scans = append(scans, nmap_stub_scan)
+		if *udp {
+			
+		}
 	}
 	/*
 	if os.Getuid() == 0 {
