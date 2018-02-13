@@ -25,7 +25,7 @@ import (
 */
 
 // debug?
-var debug = false
+var debug = true
 
 // start time (for log files)
 var scan_start = time.Now()
@@ -36,7 +36,7 @@ var iteration = 0
 var status_spin = []string{"\\","|","/","-"}
 
 // output log file
-var logging = true
+var logging = false
 var logfile_root_path string
 var logfile_path string
 
@@ -1001,6 +1001,7 @@ func main() {
 
 	// parse out the flags passed
 	target		:= flag.String("target", "d34db33f", "IP address of target machine")
+	scan_level	:= flag.Int("scanlevel", 1, "depth of initial scan. 1(light) -> 3(heavy)")
 	output_path	:= flag.String("logdir", default_log_dir, "location of output log file")
 	testing		:= flag.Bool("testing", false, "use test executables for enum output")
 	flag.Parse()
@@ -1050,6 +1051,7 @@ func main() {
 		colorPrint("[!] specify a target with '-target=TARGET_IP'", string_format.red, logging, true)
 		os.Exit(0)
 	}
+
 	// runmode summary
 	opt_1 := fmt.Sprintf("[*] run options")
 	logfile_path_string := fmt.Sprintf("\t[*] logging to %v", *output_path)
@@ -1059,6 +1061,12 @@ func main() {
 		regularPrint(logfile_path_string, logging, true)
 	}
 	regularPrint(opt_2, logging, true)
+	scan_level_descriptions := []string{"light", "medium", "heavy"}
+	if *scan_level < 0 || *scan_level > 3 {
+		colorPrint("[!] please enter a valid scan level (1-3)", string_format.red, logging, true)
+	}
+	scan_level_string := fmt.Sprintf("\t[*] scan depth:\t\t%v (%v)", *scan_level, scan_level_descriptions[*scan_level-1]);
+	regularPrint(scan_level_string, logging, true)
 
 	// if testing, set the os to use the CWD as an executable path
 	if *testing {		
@@ -1089,18 +1097,34 @@ func main() {
 	spoof_service := &service{"all", *target, "all", "all"}
 	nmap_tcp_scan := createOSServiceScan(spoof_service, "nmap-tcp-recon", "nmap", []string{})
 	nmap_udp_scan := createOSServiceScan(spoof_service, "nmap-udp-recon", "nmap", []string{})
+	nmap_tcp_scan.args = []string{}
+	nmap_udp_scan.args = []string{}
+	if *scan_level == 1 {
+		nmap_tcp_scan.args = []string{"-vv", "-Pn", "--top-ports", "2000", *target}
+		nmap_udp_scan.args = []string{"-vv", "-Pn", "-A", "-sU", "--top-ports", "1000", *target}
+	} else if *scan_level == 2 {
+		nmap_tcp_scan.args = []string{"-vv", "-Pn", "-A", "--top-ports", "2000", *target}
+		nmap_udp_scan.args = []string{"-vv", "-Pn", "-A", "-sU", "--top-ports", "1000", *target}
+	} else {
+		nmap_tcp_scan.args = []string{"-vv", "-Pn", "-A", "-sS", "-p-", *target}
+		nmap_udp_scan.args = []string{"-vv", "-Pn", "-A", "-sU", "--top-ports", "2000", *target}
+	}
+	
+	if debug {
+		initial1 := fmt.Sprintf("[debug] nmap tcp: %v", scanAsCommandLine(&nmap_tcp_scan))
+		initial2 := fmt.Sprintf("[debug] nmap udp: %v", scanAsCommandLine(&nmap_udp_scan))
+		regularPrint(initial1, logging, true)
+		regularPrint(initial2, logging, true)
+	}
+
 	if os.Getuid() == 0 {
 		getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v), script scanning with nmap", os.Getuid())
 		colorPrint(getuid_string, string_format.green, logging, true)
-		nmap_tcp_scan.args = []string{"-vv", "-Pn", "-A", "-sC", "-sS", "-p-", *target}
-		nmap_udp_scan.args = []string{"-vv", "-Pn", "-A", "-sC", "-sU", "--top-ports", "200"}
 		scans = append(scans, nmap_tcp_scan)
 		scans = append(scans, nmap_udp_scan)
 	} else {
 		getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), script scanning not performed", os.Getuid())
 		colorPrint(getuid_string, string_format.yellow, logging, true)
-		nmap_tcp_scan.args = []string{"-vv", "-Pn", "-A", "-p-", *target}
-		//nmap_tcp_scan.args = []string{*target}
 		// don't bother with UDP since we can't w/o root
 		scans = append(scans, nmap_tcp_scan)
 	}
@@ -1146,18 +1170,23 @@ func main() {
 	colorPrint("[*] starting follow up scans on identified services", string_format.blue, logging, true)
 	// start new scans based on the service info
 	scans = makeServiceScanList(identified_services)
-	service_scan_channel := make(chan bool)
-	for i := 0; i < len(scans); i++ {
-		go performScan(*target, &scans[i])
+	//  len(identified_services > 0 is already checked above
+	if len(scans) == 0 {
+		colorPrint("[-] no built-in follow up scans for identified services", string_format.red, logging, true)
+	} else {
+		service_scan_channel := make(chan bool)
+		for i := 0; i < len(scans); i++ {
+			go performScan(*target, &scans[i])
+		}
+		go scanProgress(scans, *target, service_scan_channel)
+		<-service_scan_channel
+			// process the post-scan results and perform any subsequent analysis
+		// or further enum/discovery
+		for i := 0; i < len(scans); i++ {
+			postScanProcessing(scans[i])
+		}
 	}
-	go scanProgress(scans, *target, service_scan_channel)
-	<-service_scan_channel
 
-	// process the post-scan results and perform any subsequent analysis
-	// or further enum/discovery
-	for i := 0; i < len(scans); i++ {
-		postScanProcessing(scans[i])
-	}
 	total_scan_time := time.Now().Sub(scan_start).Minutes()
 	total_scan_print := fmt.Sprintf("%.2f mins", total_scan_time)
 	complete_string := fmt.Sprintf("[+] cuttlefish enumeration of %v complete! (%v)%v", *target, total_scan_print, string_format.end)
