@@ -1141,12 +1141,11 @@ func main() {
 		scans = append(scans, nmap_tcp_scan)
 	}
 
-	if debug {
-		regularPrint("[*] running the following scans:", logging, true)
-		for i := 0; i < len(scans); i++ {
-			scan_print := fmt.Sprintf("\t%v", scanAsCommandLine(&scans[i]))
-			regularPrint(scan_print, logging, true)
-		}
+	
+	regularPrint("[*] running the following scans:", logging, true)
+	for i := 0; i < len(scans); i++ {
+		scan_print := fmt.Sprintf("\t%v", scanAsCommandLine(&scans[i]))
+		regularPrint(scan_print, logging, true)
 	}
 
 	// setup the scan channel
