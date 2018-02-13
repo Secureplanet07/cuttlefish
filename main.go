@@ -1126,10 +1126,8 @@ func main() {
 		if *udp {
 			//
 		}
-		scan_len := fmt.Sprintf("[*] len scans: %v", len(scans))
-		regularPrint(scan_len, logging, true)
 	}
-	/*
+	
 	if os.Getuid() == 0 {
 		if *udp == true {
 			getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
@@ -1151,7 +1149,7 @@ func main() {
 		colorPrint(getuid_string, string_format.yellow, logging, true)
 		// don't bother with UDP since we can't w/o root
 		scans = append(scans, nmap_tcp_scan)
-	} */
+	}
 
 	// setup the scan channel
 	recon_scan_channel := make(chan bool)
