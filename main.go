@@ -1005,6 +1005,7 @@ func main() {
 	udp 		:= flag.Bool("udp", false, "perform recon UDP scan")
 	output_path	:= flag.String("logdir", default_log_dir, "location of output log file")
 	testing		:= flag.Bool("testing", false, "use test executables for enum output")
+	stub 		:= flag.Bool("stub", false, "testing field, replaces initial scan with `sleep 1`")
 	flag.Parse()
 
 	// set up the log file path
@@ -1118,6 +1119,12 @@ func main() {
 		regularPrint(initial2, logging, true)
 	}
 
+	if *stub {
+		nmap_stub_scan := createOSServiceScan(spoof_service, "stub-scan", "sleep", []string{})
+		nmap_stub_scan.args = []string{"1"}
+		scans = append(scans, nmap_stub_scan)
+	}
+	/*
 	if os.Getuid() == 0 {
 		if *udp == true {
 			getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
@@ -1139,7 +1146,7 @@ func main() {
 		colorPrint(getuid_string, string_format.yellow, logging, true)
 		// don't bother with UDP since we can't w/o root
 		scans = append(scans, nmap_tcp_scan)
-	}
+	} */
 
 	// setup the scan channel
 	recon_scan_channel := make(chan bool)
