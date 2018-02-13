@@ -1033,7 +1033,7 @@ func main() {
 	cuttle_header_1 := "-------------.__   ,+-.           ,+ ~.     ,-----------"
 	cuttle_header_2 := "           O  o `- o ,-`           `.o `._./            "
 	cuttle_header_3 := "o   O   o   o _O  o /   cuttlefish   \\ O  o    O   o   O"
-	cuttle_header_4 := "__o___O____,-`  `\\_*         v0.0     \\._____o___coastal"
+	cuttle_header_4 := "__o___O____,-`  `\\_*         v0.1     \\._____o___coastal"
 	cuttle_header_5 := "[~] supports identification and enumeration of: "
 	cuttle_header_6 := "\tftp, ssh, telnet, smtp, snmp, ftp, http, https"
 	cuttle_header_7 := "\tsmb, ms-sql, rdp"
