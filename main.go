@@ -25,7 +25,7 @@ import (
 */
 
 // debug?
-var debug = true
+var debug = false
 
 // start time (for log files)
 var scan_start = time.Now()
@@ -36,7 +36,7 @@ var iteration = 0
 var status_spin = []string{"\\","|","/","-"}
 
 // output log file
-var logging = false
+var logging = true
 var logfile_root_path string
 var logfile_path string
 
