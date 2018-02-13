@@ -1101,14 +1101,14 @@ func main() {
 	nmap_tcp_scan.args = []string{}
 	nmap_udp_scan.args = []string{}
 	if *scan_level == 1 {
-		nmap_tcp_scan.args = []string{"-vv", "-Pn", "--top-ports", "2000", *target}
-		nmap_udp_scan.args = []string{"-vv", "-Pn", "-A", "-sU", "--top-ports", "1000", *target}
+		nmap_tcp_scan.args = []string{"-vv", "-Pn", *target}
+		nmap_udp_scan.args = []string{"-vv", "-Pn", "-sU", *target}
 	} else if *scan_level == 2 {
-		nmap_tcp_scan.args = []string{"-vv", "-Pn", "-A", "--top-ports", "2000", *target}
-		nmap_udp_scan.args = []string{"-vv", "-Pn", "-A", "-sU", "--top-ports", "1000", *target}
+		nmap_tcp_scan.args = []string{"-vv", "-Pn", "--top-ports", "2000", *target}
+		nmap_udp_scan.args = []string{"-vv", "-Pn", "-sU", "--top-ports", "1000", *target}
 	} else {
-		nmap_tcp_scan.args = []string{"-vv", "-Pn", "-A", "-sS", "-p-", *target}
-		nmap_udp_scan.args = []string{"-vv", "-Pn", "-A", "-sU", "--top-ports", "2000", *target}
+		nmap_tcp_scan.args = []string{"-vv", "-Pn", "-sS", "-p-", *target}
+		nmap_udp_scan.args = []string{"-vv", "-Pn", "-sU", "--top-ports", "2000", *target}
 	}
 	
 	if debug {
