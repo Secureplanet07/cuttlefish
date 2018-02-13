@@ -36,7 +36,7 @@ var iteration = 0
 var status_spin = []string{"\\","|","/","-"}
 
 // output log file
-var logging = true
+var logging = false
 var logfile_root_path string
 var logfile_path string
 
@@ -1002,6 +1002,7 @@ func main() {
 	// parse out the flags passed
 	target		:= flag.String("target", "d34db33f", "IP address of target machine")
 	scan_level	:= flag.Int("scanlevel", 1, "depth of initial scan. 1(light) -> 3(heavy)")
+	udp 		:= flag.Bool("udp", false, "perform recon UDP scan")
 	output_path	:= flag.String("logdir", default_log_dir, "location of output log file")
 	testing		:= flag.Bool("testing", false, "use test executables for enum output")
 	flag.Parse()
@@ -1118,12 +1119,22 @@ func main() {
 	}
 
 	if os.Getuid() == 0 {
-		getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v), script scanning with nmap", os.Getuid())
-		colorPrint(getuid_string, string_format.green, logging, true)
+		if *udp == true {
+			getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
+			udp_string := fmt.Sprintf("\t[+] UDP scanning with nmap (-udp=True)")
+			colorPrint(getuid_string, string_format.green, logging, true)
+			colorPrint(udp_string, string_format.green, logging, true)
+		} else {
+			getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
+			udp_string := fmt.Sprintf("\t[!] UDP scanning not performed (-udp=False)")
+			colorPrint(getuid_string, string_format.green, logging, true)
+			colorPrint(udp_string, string_format.yellow, logging, true)
+		}
+		
 		scans = append(scans, nmap_tcp_scan)
 		scans = append(scans, nmap_udp_scan)
 	} else {
-		getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), script scanning not performed", os.Getuid())
+		getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), UDP scanning not performed", os.Getuid())
 		colorPrint(getuid_string, string_format.yellow, logging, true)
 		// don't bother with UDP since we can't w/o root
 		scans = append(scans, nmap_tcp_scan)
