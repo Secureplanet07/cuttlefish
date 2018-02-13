@@ -25,7 +25,7 @@ import (
 */
 
 // debug?
-var debug = false
+var debug = true
 
 // start time (for log files)
 var scan_start = time.Now()
