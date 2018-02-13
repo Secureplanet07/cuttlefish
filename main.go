@@ -383,39 +383,36 @@ func scanProgress(scans []scan, target string, scan_channel chan bool) {
 	// initialize all scans with start_time of now
 	// initialize all the logfiles with the command run (prevents an
 	// 		issue when the run is cut short with Ctl-C)
-	
-	if len(scans) > 0 {
-		for i := 0; i < len(scans); i++ {
-			current_scan := &scans[i]
-			current_scan.start_time = start_time
-			command_string := scanAsCommandLine(current_scan)
-			command_string = fmt.Sprintf("[*] running command: %v", command_string)
-			scan_logfile_path := formatScanLogfile(*current_scan)
-			log(scan_logfile_path, command_string)
-		}
-		finished := 0
-		for 1 > finished {
-			iteration += 1
-			completion_statuses := updateScansAndReturnCompletionReport(scans)
-			if allSame(completion_statuses) && completion_statuses[0] == 1 {
-				// print the final state TODO: print them here
-				// add them to the previousPrints so that they will print after completion
-				addScansToPreviousPrints(scans)
-				// we pass an empty list of scans because all of the previous scans will
-				// still be printed (since we added them to previous_prints), but
-				// outputProgress prints all of the scans in the []scan it is passed
-				// regardless of progress status.
-				// this way, all of our completed scans will be printed as a part of
-				// previous_prints, and not printed again because they are not
-				// sent in the scan array
-				outputProgress([]scan{})
-				finished = 1
+	for i := 0; i < len(scans); i++ {
+		current_scan := &scans[i]
+		current_scan.start_time = start_time
+		command_string := scanAsCommandLine(current_scan)
+		command_string = fmt.Sprintf("[*] running command: %v", command_string)
+		scan_logfile_path := formatScanLogfile(*current_scan)
+		log(scan_logfile_path, command_string)
+	}
+	finished := 0
+	for 1 > finished {
+		iteration += 1
+		completion_statuses := updateScansAndReturnCompletionReport(scans)
+		if allSame(completion_statuses) && completion_statuses[0] == 1 {
+			// print the final state TODO: print them here
+			// add them to the previousPrints so that they will print after completion
+			addScansToPreviousPrints(scans)
+			// we pass an empty list of scans because all of the previous scans will
+			// still be printed (since we added them to previous_prints), but
+			// outputProgress prints all of the scans in the []scan it is passed
+			// regardless of progress status.
+			// this way, all of our completed scans will be printed as a part of
+			// previous_prints, and not printed again because they are not
+			// sent in the scan array
+			outputProgress([]scan{})
+			finished = 1
 
-			} else {
-				outputProgress(scans)
-				// without the sleep output gets nuts
-				time.Sleep(100000000)
-			}
+		} else {
+			outputProgress(scans)
+			// without the sleep output gets nuts
+			time.Sleep(100000000)
 		}
 	}
 	// update tracked prints for number of scans
