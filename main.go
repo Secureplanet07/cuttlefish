@@ -756,9 +756,16 @@ func addSNMPScansToList(service_scan_list []scan, current_service *service) []sc
 		"snmpwalk",
 		snmpwalk_args,
 	)
+	snmpcheck_scan := createOSServiceScan(
+		current_service,
+		"snmpcheck-scan",
+		"snmp-check",
+		[]string{current_service.target},
+	)
 	service_scan_list = append(service_scan_list, nmap_snmp_scan)
 	service_scan_list = append(service_scan_list, onesixtyone_scan)
 	service_scan_list = append(service_scan_list, snmpwalk_scan)
+	service_scan_list = append(service_scan_list, snmpcheck_scan)
 	return service_scan_list
 }
 
