@@ -1145,7 +1145,7 @@ func main() {
 	regularPrint(opt_2, logging, true)
 	scan_level_descriptions := []string{"light", "medium", "heavy"}
 	if *scan_level < 0 || *scan_level > 3 {
-		colorPrint("[!] please enter a valid scan level (1-3)", string_format.red, logging, true)
+		colorPrint("[!] please enter a valid scan level (1-3) [-l 1 | -l 2 | -l 3] (default 1)", string_format.red, logging, true)
 	}
 	scan_level_string := fmt.Sprintf("\t[*] scan depth:\t\t%v (%v)", *scan_level, scan_level_descriptions[*scan_level-1]);
 	regularPrint(scan_level_string, logging, true)
@@ -1203,13 +1203,13 @@ func main() {
 		if os.Getuid() == 0 {
 			if *udp == true {
 				getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
-				udp_string := fmt.Sprintf("\t[+] UDP scanning with nmap (-u=True)")
+				udp_string := fmt.Sprintf("\t[+] UDP scanning with nmap (-u True)")
 				colorPrint(getuid_string, string_format.green, logging, true)
 				colorPrint(udp_string, string_format.green, logging, true)
 				scans = append(scans, nmap_udp_scan)
 			} else {
 				getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
-				udp_string := fmt.Sprintf("\t[!] UDP scanning not performed (-u=False)")
+				udp_string := fmt.Sprintf("\t[!] UDP scanning not performed (-u False)")
 				colorPrint(getuid_string, string_format.green, logging, true)
 				colorPrint(udp_string, string_format.yellow, logging, true)
 			}
@@ -1229,7 +1229,7 @@ func main() {
 		unicorn_scan.args = []string{"-i", scan_interface, "-mT", target_string}
 		scans = append(scans, unicorn_scan)
 	} else {
-		colorPrint("[!] please choose a valid initial scan type: (nmap | unicorn) [-i=nmap | -i=unicorn]", string_format.red, logging, true)
+		colorPrint("[!] please choose a valid initial scan type: (nmap | unicorn) [-i nmap | -i unicorn]", string_format.red, logging, true)
 		os.Exit(0)
 	}
 
