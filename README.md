@@ -2,10 +2,6 @@
 
 **cuttlefish** has morphed from my original intention of a host-distributed webapp enumeration tool, into an automated scanning tool for single-host penetration testing. I am going to enroll in OffSec's PWK to prepare for taking the OSCP, and want to have a tool that will help me perform automated host enumeration. Additionally, I wanted to learn `go` from a practical project PoV.
 
-## TODO:
-
-- [ ] Implement `unicornscan` as initial port discovery tool instead of `nmap` to increase speed
-
 ![cuttle-demo](img/cuttle-demo.gif)
 
 ### installation
@@ -17,6 +13,11 @@ An automated install script has been setup for linux (only tested on 64-bit Kali
 ```
 
 If you would like to install on a mac, install `go`, and perform the steps from the install script (post golang-installation) one at a time.
+
+### TODOs:
+
+- [x] Implement `unicornscan` as initial port discovery tool instead of `nmap` to increase speed
+
 
 ### example enumeration
 
