@@ -1122,7 +1122,7 @@ func main() {
 	}
 	// var aws_session *session.Session
 	if *target == "d34db33f" {
-		colorPrint("[!] specify a target with '-target=TARGET_IP'", string_format.red, logging, true)
+		colorPrint("[!] specify a target with '-t=TARGET_IP'", string_format.red, logging, true)
 		os.Exit(0)
 	}
 
@@ -1203,13 +1203,13 @@ func main() {
 		if os.Getuid() == 0 {
 			if *udp == true {
 				getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
-				udp_string := fmt.Sprintf("\t[+] UDP scanning with nmap (-udp=True)")
+				udp_string := fmt.Sprintf("\t[+] UDP scanning with nmap (-u=True)")
 				colorPrint(getuid_string, string_format.green, logging, true)
 				colorPrint(udp_string, string_format.green, logging, true)
 				scans = append(scans, nmap_udp_scan)
 			} else {
 				getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
-				udp_string := fmt.Sprintf("\t[!] UDP scanning not performed (-udp=False)")
+				udp_string := fmt.Sprintf("\t[!] UDP scanning not performed (-u=False)")
 				colorPrint(getuid_string, string_format.green, logging, true)
 				colorPrint(udp_string, string_format.yellow, logging, true)
 			}
