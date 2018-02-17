@@ -40,7 +40,6 @@ var status_spin = []string{"\\","|","/","-"}
 var logging = true
 var logfile_root_path string
 var logfile_path string
-var default_log_dir = "/mnt/hgfs/shared/cuttlescans"
 
 // location of enum scripts
 var working_dir,_ = os.Getwd()
@@ -1074,14 +1073,23 @@ func main() {
 	initial_scan := flag.String("s", "nmap", "Type of scan to use for initial recon (nmap | unicorn) [default nmap]")
 	scan_inter	:= flag.String("i", "", "Interface to scan on (eth0)")
 	udp 		:= flag.Bool("u", false, "perform recon UDP scan")
-	output_path	:= flag.String("l", default_log_dir, "location of output log file")
+	output_path	:= flag.String("l", "", "location of output log file")
 	testing		:= flag.Bool("testing", false, "use test executables for enum output")
 	flag.Parse()
+
+	// -----------------------------
+	// LOG SETUP
+	// -----------------------------
+	// set the default log directory, alter if the output_path is set
+	log_dir := filepath.Join(user_homedir, "Documents/cuttlelogs")
+	if len(*output_path) > 0 {
+		log_dir = *output_path
+	}
 
 	// set up the log file path
 	time_string := fmt.Sprintf("%v", scan_start.Format(time.RFC3339))
 	cuttletarget_dir := fmt.Sprintf("%v-cuttlefish-enum/%v", *target, time_string)
-	logfile_root_path = filepath.Join(*output_path, cuttletarget_dir)
+	logfile_root_path = filepath.Join(log_dir, cuttletarget_dir)
 	logfile_name := fmt.Sprintf("%v-cuttlemain.cuttlelog", *target)
 	logfile_path = filepath.Join(logfile_root_path, logfile_name)
 
@@ -1096,6 +1104,7 @@ func main() {
 			logging = false
 		}
 	}
+	// -----------------------------
 
 	// clear the terminal
 	print("\033[H\033[2J")
@@ -1140,7 +1149,7 @@ func main() {
 
 	// runmode summary
 	opt_1 := fmt.Sprintf("[*] run options")
-	logfile_path_string := fmt.Sprintf("\t[*] logging to %v", *output_path)
+	logfile_path_string := fmt.Sprintf("\t[*] logging to %v", log_dir)
 	opt_2 := fmt.Sprintf("\t[*] target:\t\t%v", *target)
 	regularPrint(opt_1, logging, true)
 	if logging {
