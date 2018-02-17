@@ -1047,7 +1047,6 @@ func parseScanInterface(given_interface string) string {
 		os.Exit(0)
 	}
 	for _, i := range all_interfaces {
-		regularPrint(comp_string, logging, true)
 		if i.Name == given_interface {
 			return given_interface
 		}
