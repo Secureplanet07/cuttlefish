@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"fmt"
+	"net"
 	"flag"
 	"math"
 	"sync"
@@ -491,39 +492,86 @@ func outputProgress(scans []scan) {
 }
 
 // identifies both open and closed running services
-func identifyServices(nmap_output string, target string) []service {
-	// grab '22/tcp' from the beginning of the line
-	var validService = regexp.MustCompile(`^(\d+/[a-z]+)\s+\w+\s+[A-z,a-z,0-9,-]+`)
-	// grab '  ssh  ' from the validated line
-	//var serviceType = regexp.MustCompile(`\s[A-z,a-z,0-9,-]+`)
+func identifyServices(scan_type string, scan_output string, target string) []service {
 	var identified_services []service
-	all_lines := strings.Split(nmap_output, "\n")
-	for i := 0; i < len(all_lines); i++  {
-		service_string := validService.FindString(all_lines[i])
-		if len(service_string) > 0 {
-			service_port := strings.Split(service_string, "/")[0]
-
-			// holy mother of hacks...not proud of this
-			service_name := strings.Replace(service_string, "     ", " ", 100)
-			service_name = strings.Replace(service_string, "\t", " ", 100)
-			service_name = strings.Replace(service_string, "   ", " ", 100)
-			service_name = strings.Replace(service_string, "  ", " ", 100)
-			service_name_list := strings.Split(service_string, " ")
-			// we iterate through and remove all the empty strings
-			parsed_service_name_list := []string{}
-			for j := 0; j < len(service_name_list); j++ {
-				if len(service_name_list[j]) > 0 {
-					parsed_service_name_list = append(parsed_service_name_list, service_name_list[j])
+	if scan_type == "nmap" {
+		// grab '22/tcp' from the beginning of the line
+		var validService = regexp.MustCompile(`^(\d+/[a-z]+)\s+\w+\s+[A-z,a-z,0-9,-]+`)
+		// grab '  ssh  ' from the validated line
+		//var serviceType = regexp.MustCompile(`\s[A-z,a-z,0-9,-]+`)
+		all_lines := strings.Split(scan_output, "\n")
+		for i := 0; i < len(all_lines); i++  {
+			service_string := validService.FindString(all_lines[i])
+			if len(service_string) > 0 {
+				service_port := strings.Split(service_string, "/")[0]
+				// replace sequential spaces with single space
+				service_name := condenseSpacesToSingle(service_string)
+				service_name_list := strings.Split(service_name, " ")
+				// we iterate through and remove all the empty strings
+				parsed_service_name_list := []string{}
+				for j := 0; j < len(service_name_list); j++ {
+					if len(service_name_list[j]) > 0 {
+						parsed_service_name_list = append(parsed_service_name_list, service_name_list[j])
+					}
 				}
-			}
-			service_name = parsed_service_name_list[2]
-			service_status := parsed_service_name_list[1]
-			new_service := service{service_name, target, service_port, service_status}
+				service_name = parsed_service_name_list[2]
+				service_status := parsed_service_name_list[1]
+				new_service := service{service_name, target, service_port, service_status}
 
-			identified_services = append(identified_services, new_service)
+				identified_services = append(identified_services, new_service)
+			}
 		}
+	} else if scan_type == "unicorn" {
+		/**/
+		all_lines := strings.Split(scan_output, "\n")
+		for i:= 0; i < len(all_lines); i++ {
+			service_line := all_lines[i]
+			if len(service_line) > 0 {
+				service_line = strings.Replace(condenseSpacesToSingle(service_line), "\t", "", len(service_line))
+				service_name := getUnicornServiceName(service_line)
+				service_port := getUnicornServicePort(service_line)
+				service_status := getUnicornServiceStatus(service_line)
+				new_service := service{service_name, target, service_port, service_status}
+				identified_services = append(identified_services, new_service)
+			}
+		} //*/
 	}
+	
 	return identified_services
+}
+
+func getUnicornServiceName(service_line string) string {
+	space_splits := strings.Split(service_line, " ")
+	partial_name := space_splits[2]
+	parsed_name := strings.Split(partial_name, "[")[0]
+	return parsed_name
+}
+
+func getUnicornServicePort(service_line string) string {
+	space_splits := strings.Split(service_line, "[")
+	partial_port := space_splits[1]
+	parsed_port := strings.Split(partial_port, "]")[0]
+	parsed_port = strings.Replace(parsed_port, " ", "", len(parsed_port))
+	return parsed_port
+}
+
+func getUnicornServiceStatus(service_line string) string {
+	space_splits := strings.Split(service_line, " ")
+	parsed_service := space_splits[1]
+	return parsed_service
+}
+
+func condenseSpacesToSingle(input_string string) string {
+	// set all repeated spaces to a single space by iterating over
+	// the full space of possible sequential space characters
+	//	len(input_string), and replacing them
+	return_string := input_string
+	for i := len(input_string); i > 1; i-- {
+		repeated_spaces := strings.Repeat(" ", i)
+		return_string = strings.Replace(return_string, repeated_spaces, " ", len(input_string))
+	}
+	return return_string
+	
 }
 
 func removeDuplicateServices(service_list []service) []service {
@@ -991,6 +1039,24 @@ func makeServiceScanList(service_list []service) []scan {
 	return service_scan_list
 }
 
+func parseScanInterface(given_interface string) string {
+	// returns "" if interface is not on system
+	all_interfaces,err := net.Interfaces()
+	if err != nil {
+		colorPrint("[!] error getting network interfaces", string_format.red, logging, true)
+		os.Exit(0)
+	}
+	for _, i := range all_interfaces {
+		comp_string := fmt.Sprintf("comparing (%v) to (%v)", given_interface, i.Name)
+		regularPrint(comp_string, logging, true)
+		if i.Name == given_interface {
+			return given_interface
+		}
+		
+	}
+	return ""
+}
+
 func main() {
 	// initialize the scans so we can clean them up on exit Ctl-C
 	var scans []scan
@@ -1005,9 +1071,11 @@ func main() {
 	}()
 
 	// parse out the flags passed
-	target		:= flag.String("target", "d34db33f", "IP address of target machine")
-	scan_level	:= flag.Int("scanlevel", 1, "depth of initial scan. 1(light) -> 3(heavy)")
-	udp 		:= flag.Bool("udp", false, "perform recon UDP scan")
+	target		:= flag.String("t", "d34db33f", "IP address of target machine")
+	scan_level	:= flag.Int("l", 1, "depth of initial scan. 1(light) -> 3(heavy)")
+	initial_scan := flag.String("s", "unicorn", "Type of scan to use for initial recon (unicorn or nmap) [default unicorn]")
+	scan_inter	:= flag.String("i", "", "Interface to scan on (eth0)")
+	udp 		:= flag.Bool("u", false, "perform recon UDP scan")
 	output_path	:= flag.String("logdir", default_log_dir, "location of output log file")
 	testing		:= flag.Bool("testing", false, "use test executables for enum output")
 	flag.Parse()
@@ -1058,6 +1126,14 @@ func main() {
 		os.Exit(0)
 	}
 
+	// parse the scan interface and see if it exists
+	scan_interface := parseScanInterface(*scan_inter)
+
+	if scan_interface == "" {
+		colorPrint("[!] specify an interface to scan on i.e. '-i=eth0'", string_format.red, logging, true)
+		os.Exit(0)
+	}
+
 	// runmode summary
 	opt_1 := fmt.Sprintf("[*] run options")
 	logfile_path_string := fmt.Sprintf("\t[*] logging to %v", *output_path)
@@ -1101,50 +1177,62 @@ func main() {
 	}
 	
 	spoof_service := &service{"all", *target, "all", "all"}
-	nmap_tcp_scan := createOSServiceScan(spoof_service, "nmap-tcp-recon", "nmap", []string{})
-	nmap_udp_scan := createOSServiceScan(spoof_service, "nmap-udp-recon", "nmap", []string{})
-	nmap_tcp_scan.args = []string{}
-	nmap_udp_scan.args = []string{}
-	if *scan_level == 1 {
-		nmap_tcp_scan.args = []string{"-vv", "-A", "-Pn", *target}
-		nmap_udp_scan.args = []string{"-vv", "-A", "-Pn", "-sU", *target}
-	} else if *scan_level == 2 {
-		nmap_tcp_scan.args = []string{"-vv", "-A", "-Pn", "--top-ports", "2000", *target}
-		nmap_udp_scan.args = []string{"-vv", "-A", "-Pn", "-sU", "--top-ports", "1000", *target}
-	} else {
-		nmap_tcp_scan.args = []string{"-vv", "-A", "-Pn", "-sS", "-p-", *target}
-		nmap_udp_scan.args = []string{"-vv", "-A", "-Pn", "-sU", "--top-ports", "2000", *target}
-	}
-	
-	if debug {
-		initial1 := fmt.Sprintf("[debug] nmap tcp: %v", scanAsCommandLine(&nmap_tcp_scan))
-		initial2 := fmt.Sprintf("[debug] nmap udp: %v", scanAsCommandLine(&nmap_udp_scan))
-		regularPrint(initial1, logging, true)
-		regularPrint(initial2, logging, true)
-	}
-	
-	if os.Getuid() == 0 {
-		if *udp == true {
-			getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
-			udp_string := fmt.Sprintf("\t[+] UDP scanning with nmap (-udp=True)")
-			colorPrint(getuid_string, string_format.green, logging, true)
-			colorPrint(udp_string, string_format.green, logging, true)
-			scans = append(scans, nmap_udp_scan)
+	if *initial_scan == "nmap" {
+		nmap_tcp_scan := createOSServiceScan(spoof_service, "nmap-tcp-recon", "nmap", []string{})
+		nmap_udp_scan := createOSServiceScan(spoof_service, "nmap-udp-recon", "nmap", []string{})
+		nmap_tcp_scan.args = []string{}
+		nmap_udp_scan.args = []string{}
+		if *scan_level == 1 {
+			nmap_tcp_scan.args = []string{"-vv", "-A", "-Pn", *target}
+			nmap_udp_scan.args = []string{"-vv", "-A", "-Pn", "-sU", *target}
+		} else if *scan_level == 2 {
+			nmap_tcp_scan.args = []string{"-vv", "-A", "-Pn", "--top-ports", "2000", *target}
+			nmap_udp_scan.args = []string{"-vv", "-A", "-Pn", "-sU", "--top-ports", "1000", *target}
 		} else {
-			getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
-			udp_string := fmt.Sprintf("\t[!] UDP scanning not performed (-udp=False)")
-			colorPrint(getuid_string, string_format.green, logging, true)
-			colorPrint(udp_string, string_format.yellow, logging, true)
+			nmap_tcp_scan.args = []string{"-vv", "-A", "-Pn", "-sS", "-p-", *target}
+			nmap_udp_scan.args = []string{"-vv", "-A", "-Pn", "-sU", "--top-ports", "2000", *target}
 		}
 		
-		scans = append(scans, nmap_tcp_scan)
+		if debug {
+			initial1 := fmt.Sprintf("[debug] nmap tcp: %v", scanAsCommandLine(&nmap_tcp_scan))
+			initial2 := fmt.Sprintf("[debug] nmap udp: %v", scanAsCommandLine(&nmap_udp_scan))
+			regularPrint(initial1, logging, true)
+			regularPrint(initial2, logging, true)
+		}
 		
+		if os.Getuid() == 0 {
+			if *udp == true {
+				getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
+				udp_string := fmt.Sprintf("\t[+] UDP scanning with nmap (-udp=True)")
+				colorPrint(getuid_string, string_format.green, logging, true)
+				colorPrint(udp_string, string_format.green, logging, true)
+				scans = append(scans, nmap_udp_scan)
+			} else {
+				getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
+				udp_string := fmt.Sprintf("\t[!] UDP scanning not performed (-udp=False)")
+				colorPrint(getuid_string, string_format.green, logging, true)
+				colorPrint(udp_string, string_format.yellow, logging, true)
+			}
+			
+			scans = append(scans, nmap_tcp_scan)
+			
+		} else {
+			getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), UDP scanning not performed", os.Getuid())
+			colorPrint(getuid_string, string_format.yellow, logging, true)
+			// don't bother with UDP since we can't w/o root
+			scans = append(scans, nmap_tcp_scan)
+		}
+	} else if *initial_scan == "unicorn" {
+		colorPrint("[*] performing initial recon unicornscan", string_format.green, logging, true)
+		unicorn_scan := createOSServiceScan(spoof_service, "unicorn-recon", "unicornscan", []string{})
+		target_string := fmt.Sprintf("%v:a", *target)
+		unicorn_scan.args = []string{"-i", scan_interface, "-mT", target_string}
+		scans = append(scans, unicorn_scan)
 	} else {
-		getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), UDP scanning not performed", os.Getuid())
-		colorPrint(getuid_string, string_format.yellow, logging, true)
-		// don't bother with UDP since we can't w/o root
-		scans = append(scans, nmap_tcp_scan)
+		colorPrint("[!] please choose a valid initial scan type: (nmap | unicorn) [-i=nmap | -i=unicorn]", string_format.red, logging, true)
+		os.Exit(0)
 	}
+
 
 	if debug {
 		regularPrint("[*] running the following scans:", logging, true)
@@ -1158,7 +1246,7 @@ func main() {
 	recon_scan_channel := make(chan bool)
 	
 	// pass by reference so we update the shared struct value
-	colorPrint("[*] starting intial nmap recon scan", string_format.blue,logging, true)
+	colorPrint("[*] starting initial recon scans", string_format.blue,logging, true)
 	for i := 0; i < len(scans); i++ {
 		go performScan(*target, &scans[i])
 	}
@@ -1167,9 +1255,9 @@ func main() {
 	<-recon_scan_channel
 	
 	// now let's find services from the recon scan results
-	identified_services := identifyServices(scans[0].results, *target)
+	identified_services := identifyServices(*initial_scan,scans[0].results, *target)
 	if os.Getuid() == 0 && len(scans) > 1 {
-		identified_udp_services := identifyServices(scans[1].results, *target)
+		identified_udp_services := identifyServices(*initial_scan,scans[1].results, *target)
 		identified_services := append(identified_services, identified_udp_services...)
 		identified_services = removeDuplicateServices(identified_services)
 	}

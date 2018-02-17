@@ -1,8 +1,28 @@
 package main
 
 import (
+	"fmt"
+	//"strings"
 	"testing"
 )
+
+var unicorn_output_1 = `
+TCP open	             ftp[   21]		from 10.11.1.22  ttl 64 
+TCP open	             ssh[   22]		from 10.11.1.22  ttl 64 
+TCP open	          telnet[   23]		from 10.11.1.22  ttl 64 
+TCP open	            smtp[   25]		from 10.11.1.22  ttl 64 
+TCP open	            http[   80]		from 10.11.1.22  ttl 64 
+TCP open	          sunrpc[  111]		from 10.11.1.22  ttl 64 
+TCP open	     netbios-ssn[  139]		from 10.11.1.22  ttl 64 
+TCP open	            smux[  199]		from 10.11.1.22  ttl 64 
+TCP open	           https[  443]		from 10.11.1.22  ttl 64 
+TCP open	           pop3s[  995]		from 10.11.1.22  ttl 64 
+TCP closed	     filenet-tms[32768]		from 10.11.1.22  ttl 64 
+`
+
+var unicorn_service_1 = "TCP open ftp[ 21]from 10.11.1.22 ttl 64 "
+var unicorn_service_2 = "TCP open ssh[ 22]from 10.11.1.22 ttl 64 "
+var unicorn_service_3 = "TCP open filenet-tms[32768]from 10.11.1.22 ttl 64"
 
 var nmap_output_1 = `
 Starting Nmap 7.60 ( https://nmap.org ) at 2018-01-01 22:26 EST
@@ -70,8 +90,87 @@ PORT     STATE  SERVICE
 8180/tcp open   unknown
 `
 
+func TestIdentifyUnicornServices1(t *testing.T) {
+	/**/
+	identified := identifyServices("unicorn", unicorn_output_1, "127.0.0.1")
+	
+	if len(identified) != 11 {
+		error_string := fmt.Sprintf("did not properly ID services (%v/11)", len(identified))
+		t.Errorf(error_string)
+	} //*/
+}
+
+func TestGetUnicornServiceName(t *testing.T) {
+	name1 := getUnicornServiceName(unicorn_service_1)
+	name2 := getUnicornServiceName(unicorn_service_2)
+	name3 := getUnicornServiceName(unicorn_service_3)
+	if name1 != "ftp" {
+		error_string := fmt.Sprintf("expected (ftp), got (%v)", name1)
+		t.Errorf(error_string)
+	}
+	if name2 != "ssh" {
+		error_string := fmt.Sprintf("expected (ssh), got (%v)", name1)
+		t.Errorf(error_string)
+	}
+	if name3 != "filenet-tms" {
+		error_string := fmt.Sprintf("expected (filenet-tms), got (%v)", name1)
+		t.Errorf(error_string)
+	}
+}
+
+func TestGetUnicornServicePort(t *testing.T) {
+	port1 := getUnicornServicePort(unicorn_service_1)
+	port2 := getUnicornServicePort(unicorn_service_2)
+	port3 := getUnicornServicePort(unicorn_service_3)
+	if port1 != "21" {
+		error_string := fmt.Sprintf("expected (21), got (%v)", port1)
+		t.Errorf(error_string)
+	}
+	if port2 != "22" {
+		error_string := fmt.Sprintf("expected (22), got (%v)", port2)
+		t.Errorf(error_string)
+	}
+	if port3 != "32768" {
+		error_string := fmt.Sprintf("expected (32768), got (%v)", port3)
+		t.Errorf(error_string)
+	}
+}
+
+func TestGetUnicornServiceStatus(t *testing.T) {
+	status1 := getUnicornServiceStatus(unicorn_service_1)
+	status2 := getUnicornServiceStatus(unicorn_service_2)
+	status3 := getUnicornServiceStatus(unicorn_service_3)
+	if status1 != "open" {
+		error_string := fmt.Sprintf("expected (open), got (%v)", status1)
+		t.Errorf(error_string)
+	}
+	if status2 != "open" {
+		error_string := fmt.Sprintf("expected (open), got (%v)", status2)
+		t.Errorf(error_string)
+	}
+	if status3 != "open" {
+		error_string := fmt.Sprintf("expected (open), got (%v)", status3)
+		t.Errorf(error_string)
+	}
+}
+
+func TestCondenseSpacesToSingle(t *testing.T) {
+	test_string_1 := "                   "
+	test_string_2 := "this   is       a test"
+	condensed_string_1 := condenseSpacesToSingle(test_string_1)
+	condensed_string_2 := condenseSpacesToSingle(test_string_2)
+	if len(condensed_string_1) > 1 {
+		error_string := fmt.Sprintf("expected (%v), got (%v)", " ", condensed_string_1)
+		t.Errorf(error_string)
+	}
+	if len(condensed_string_2) > 14 {
+		error_string := fmt.Sprintf("expected (%v), got (%v)", "this is a test", condensed_string_2)
+		t.Errorf(error_string)
+	}
+}
+
 func TestIdentifyServices1(t *testing.T) {
-	identified := identifyServices(nmap_output_1)
+	identified := identifyServices("nmap",nmap_output_1, "127.0.0.1")
 	if len(identified) != 2 {
 		t.Errorf("did not ID ssh and http\n")
 	}
@@ -110,7 +209,7 @@ func TestIdentifyServices2(t *testing.T) {
 		[]string{"8009","open","ajp13"},
 		[]string{"8180","open","unknown"},
 	}
-	identified := identifyServices(nmap_output_2)
+	identified := identifyServices("nmap",nmap_output_2, "127.0.0.1")
 	if len(identified) != len(nmap_output_2_results) {
 		t.Errorf("didn't identify all running services\n")
 	}
@@ -130,14 +229,15 @@ func TestMakeServiceScanList(t *testing.T) {
 	}
 } //*/
 
+
 func TestRemoveDuplicateServices(t *testing.T) {
 	service_list_1 := []service {
-		service{"ssh", "22", "initialized"},
-		service{"http", "80", "initialized"},
-		service{"ssh", "31337", "initialized"},
+		service{"ssh", "127.0.0.1", "22", "initialized"},
+		service{"http", "127.0.0.1", "80", "initialized"},
+		service{"ssh", "127.0.0.1", "31337", "initialized"},
 	}
 	service_list_2 := []service {
-		service{"ssh", "22", "initialized"},
+		service{"ssh", "127.0.0.1", "22", "initialized"},
 	}
 
 	dups_1 := removeDuplicateServices(service_list_1)
