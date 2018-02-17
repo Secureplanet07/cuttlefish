@@ -1047,7 +1047,6 @@ func parseScanInterface(given_interface string) string {
 		os.Exit(0)
 	}
 	for _, i := range all_interfaces {
-		comp_string := fmt.Sprintf("comparing (%v) to (%v)", given_interface, i.Name)
 		regularPrint(comp_string, logging, true)
 		if i.Name == given_interface {
 			return given_interface
@@ -1130,8 +1129,14 @@ func main() {
 	scan_interface := parseScanInterface(*scan_inter)
 
 	if scan_interface == "" {
-		colorPrint("[!] specify an interface to scan on i.e. '-i=eth0'", string_format.red, logging, true)
-		os.Exit(0)
+		if len(*scan_inter) == 0 {
+			colorPrint("[!] specify a network interface to scan on i.e. '-i=eth0'", string_format.red, logging, true)
+			os.Exit(0)
+		} else {
+			error_string := fmt.Sprintf("[!] could not find network interface %v. please try another", *scan_inter)
+			colorPrint(error_string, string_format.red, logging, true)
+			os.Exit(0)
+		}
 	}
 
 	// runmode summary
