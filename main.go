@@ -1071,7 +1071,7 @@ func main() {
 	// parse out the flags passed
 	target		:= flag.String("t", "d34db33f", "IP address of target machine")
 	scan_level	:= flag.Int("l", 1, "depth of initial scan. 1(light) -> 3(heavy)")
-	initial_scan := flag.String("s", "unicorn", "Type of scan to use for initial recon (unicorn or nmap) [default unicorn]")
+	initial_scan := flag.String("s", "nmap", "Type of scan to use for initial recon (nmap | unicorn) [default nmap]")
 	scan_inter	:= flag.String("i", "", "Interface to scan on (eth0)")
 	udp 		:= flag.Bool("u", false, "perform recon UDP scan")
 	output_path	:= flag.String("logdir", default_log_dir, "location of output log file")
