@@ -39,6 +39,7 @@ var status_spin = []string{"\\","|","/","-"}
 var logging = true
 var logfile_root_path string
 var logfile_path string
+var default_log_dir = "/mnt/hgfs/shared/cuttlescans"
 
 // location of enum scripts
 var working_dir,_ = os.Getwd()
@@ -49,12 +50,12 @@ var current_user, _ = user.Current()
 var user_homedir = current_user.HomeDir
 
 // arguments to scans
-var hydra_default_user_wordlist = 	filepath.Join(user_homedir, "tools/SecLists/Usernames/top_shortlist.txt")
-var hydra_default_user_passlist = 	filepath.Join(user_homedir, "tools/SecLists/Passwords/best1050.txt")
-var gobuster_default_dirlist = 		filepath.Join(user_homedir, "tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt")
-var gobuster_default_filelist = 	filepath.Join(user_homedir, "tools/SecLists/Discovery/Web_Content/raft-medium-files.txt")
-var gobuster_default_cgilist = 		filepath.Join(user_homedir, "tools/SecLists/Discovery/Web_Content/cgis.txt")
-var smtp_default_namelist = 		filepath.Join(user_homedir, "tools/SecLists/Usernames/top_shortlist.txt")
+var hydra_default_user_wordlist = 	filepath.Join(user_homedir, "Documents/tools/SecLists/Usernames/top_shortlist.txt")
+var hydra_default_user_passlist = 	filepath.Join(user_homedir, "Documents/tools/SecLists/Passwords/best1050.txt")
+var gobuster_default_dirlist = 		filepath.Join(user_homedir, "Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt")
+var gobuster_default_filelist = 	filepath.Join(user_homedir, "Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt")
+var gobuster_default_cgilist = 		filepath.Join(user_homedir, "Documents/tools/SecLists/Discovery/Web_Content/cgis.txt")
+var smtp_default_namelist = 		filepath.Join(user_homedir, "Documents/tools/SecLists/Usernames/top_shortlist.txt")
 
 // stuff to keep track of the prints so we can update the terminal ouput
 // properly when we print past the end of the terminal
@@ -995,9 +996,6 @@ func main() {
 		cleanup(scans)
 		os.Exit(1)
 	}()
-
-	// create the default logfile directory from initialized globals
-	default_log_dir := "/mnt/hgfs/shared/"
 
 	// parse out the flags passed
 	target		:= flag.String("target", "d34db33f", "IP address of target machine")
