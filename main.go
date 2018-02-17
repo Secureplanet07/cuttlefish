@@ -1129,7 +1129,7 @@ func main() {
 
 	if scan_interface == "" {
 		if len(*scan_inter) == 0 {
-			colorPrint("[!] specify a network interface to scan on i.e. '-i=eth0'", string_format.red, logging, true)
+			colorPrint("[!] specify a network interface to scan on i.e. '-i eth0'", string_format.red, logging, true)
 			os.Exit(0)
 		} else {
 			error_string := fmt.Sprintf("[!] could not find network interface %v. please try another", *scan_inter)
