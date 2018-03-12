@@ -21,6 +21,7 @@ cd $INSTALLDIR
 echo "[*] changing gopath to current dir"
 echo 'export GOPATH=$INSTALLDIR' >> ~/.bashrc
 source ~/.bashrc
+echo "[*] GOPATH: $GOPATH"
 echo "[*] installing go dependencies"
 go get -u github.com/wayneashleyberry/terminal-dimensions
 echo "[*] compiling project"
