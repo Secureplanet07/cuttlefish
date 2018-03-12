@@ -10,7 +10,8 @@ then
 	cd ~/Downloads
 	curl -O 'https://dl.google.com/go/go1.9.3.linux-amd64.tar.gz'
 	sudo tar -C /usr/local -xzf ~/Downloads/go1.9.3.linux-amd64.tar.gz
-	export PATH="$PATH:/usr/local/go/bin"
+	echo 'PATH="$PATH:/usr/local/go/bin"' >> ~/.bashrc
+	source ~/.bashrc
 fi
 echo "[+] golang is installed!"
 cd $INSTALLDIR
@@ -21,7 +22,8 @@ go get -u github.com/wayneashleyberry/terminal-dimensions
 echo "[*] compiling project"
 go build
 echo "[*] linking to /usr/local/bin"
-export PATH="$PATH:/usr/local/bin"
+echo 'PATH="$PATH:/usr/local/bin"' >> ~/.bashrc
+source ~/.bashrc
 ln -s $(pwd)/cuttlefish /usr/local/bin/cuttlefish 
 echo "[*] installing non-distro tools"
 apt-get install gobuster
