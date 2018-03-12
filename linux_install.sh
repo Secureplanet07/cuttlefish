@@ -29,6 +29,7 @@ echo "[*] linking to /usr/local/bin"
 echo 'export PATH="$PATH:/usr/local/bin"' >> ~/.bashrc
 source ~/.bashrc
 echo "[*] PATH: $PATH"
+rm /usr/local/bin/cuttlefish
 ln -s $INSTALLDIR/cuttlefish /usr/local/bin/cuttlefish 
 echo "[*] cuttlefish: $(which cuttlefish)"
 echo "[*] installing non-distro tools"
@@ -43,5 +44,4 @@ echo "	[*] go binaries: $(which go)"
 echo "	[*] GOPATH: $GOPATH"
 echo "	[*] PATH: $PATH"
 echo "	[*] cuttlefish: $(which cuttlefish)"
-echo -e "	[*] SecLists: \n$(for dir in $(ls ~/Documents/tools/SecLists); do echo '		$dir'; done)"
 echo "[+] installation complete!"
