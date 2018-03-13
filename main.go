@@ -819,7 +819,7 @@ func addSNMPScansToList(service_scan_list []scan, current_service *service) []sc
 func addHTTPScansToList(service_scan_list []scan, current_service *service) []scan {
 	// dynamically alter prefix to either http or https
 	url_target := fmt.Sprintf("http://%v", current_service.target)
-	
+	url_port_target := fmt.Sprintf("%v:%v", url_target, current_service.port)
 	// if it's an https service, change the url_target to prepend 
 	// https instead of http
 	if strings.Contains(current_service.name, "https") || 
@@ -836,9 +836,10 @@ func addHTTPScansToList(service_scan_list []scan, current_service *service) []sc
 		)
 		service_scan_list = append(service_scan_list, sslscan_scan)
 	}
+	// add port to gobuster
 	gobuster_dir_args := []string{
 		"-u", 
-		url_target, 
+		url_port_target, 
 		"-w", 
 		gobuster_default_dirlist,
 	}
@@ -850,7 +851,7 @@ func addHTTPScansToList(service_scan_list []scan, current_service *service) []sc
 	)
 	gobuster_cgi_args := []string{
 		"-u", 
-		url_target, 
+		url_port_target, 
 		"-w", 
 		gobuster_default_cgilist,
 	}
@@ -864,7 +865,7 @@ func addHTTPScansToList(service_scan_list []scan, current_service *service) []sc
 		current_service,
 		"nikto-scan",
 		"nikto",
-		[]string{"-h", url_target},
+		[]string{"-h", url_target, "-p", current_service.port},
 	)
 	http_nmap_scan_args := []string{
 		"-sV", 
@@ -886,14 +887,14 @@ func addHTTPScansToList(service_scan_list []scan, current_service *service) []sc
 		"nmap",
 		http_nmap_scan_args,
 	)
-	http_curl_scan_args := []string{"-I", url_target}
+	http_curl_scan_args := []string{"-I", url_port_target}
 	http_curl_scan := createOSServiceScan(
 		current_service,
 		"http-curl-scan",
 		"curl",
 		http_curl_scan_args,
 	)
-	robots_txt_scan_target := fmt.Sprintf("%v/robots.txt", url_target)
+	robots_txt_scan_target := fmt.Sprintf("%v/robots.txt", url_port_target)
 	robots_txt_scan := createOSServiceScan(
 		current_service,
 		"robots-txt-scan",
