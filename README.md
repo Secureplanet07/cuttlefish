@@ -14,6 +14,27 @@ An automated install script has been setup for linux (only tested on 64-bit Kali
 
 If you would like to install on a mac, install `go`, and perform the steps from the install script (post golang-installation) one at a time.
 
+### usage
+
+```
+$ ./cuttlefish -h
+Usage of ./cuttlefish:
+  -d int
+    	depth of initial scan. 1(light) -> 3(heavy) (default 1)
+  -f string
+    	run secondary scans from nmap output file (non-greppable format) (default "d34db33f")
+  -i string
+    	Interface to scan on (eth0)
+  -l string
+    	location of output log file
+  -s string
+    	Type of scan to use for initial recon (nmap | unicorn) [default nmap] (default "nmap")
+  -t string
+    	IP address of target machine (default "d34db33f")
+  -testing
+    	use test executables for enum output
+  -u	perform recon UDP scan
+```
 
 ### example enumeration
 
