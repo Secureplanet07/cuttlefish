@@ -23,9 +23,9 @@ echo 'export GOPATH=$INSTALLDIR' >> ~/.bashrc
 source ~/.bashrc
 echo "[*] GOPATH: $GOPATH"
 echo "[*] installing go dependencies"
-go get -u github.com/wayneashleyberry/terminal-dimensions
+/usr/local/go/bin/go get -u github.com/wayneashleyberry/terminal-dimensions
 echo "[*] compiling project"
-go build
+/usr/local/go/bin/go build
 echo "[*] linking to /usr/local/bin"
 echo 'export PATH="$PATH:/usr/local/bin"' >> ~/.bashrc
 source ~/.bashrc
