@@ -15,6 +15,8 @@ fi
 export GOPATH=`pwd`
 echo "[*] pulling new version"
 git pull
+echo "[*] old binary: $(shasum cuttlefish)"
 echo "[*] compiling new version"
-go build
+/usr/local/go/bin/go build
+echo "[*] new binary: $(shasum cuttlefish)"
 echo "[+] done!"

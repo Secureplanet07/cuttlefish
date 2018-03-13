@@ -1030,6 +1030,8 @@ func makeServiceScanList(service_list []service) []scan {
 			service_scan_list = addHTTPScansToList(service_scan_list, current_service)
 		} else if current_service.name == "microsoft-ds" {
 			service_scan_list = addSMBScansToList(service_scan_list, current_service)
+		} else if current_service.name == "netbios-ssn" {
+			service_scan_list = addSMBScansToList(service_scan_list, current_service)
 		} else if current_service.name == "ms-sql" {
 			service_scan_list = addMSSQLScansToList(service_scan_list, current_service)
 		} else if current_service.name == "msdrdp" || current_service.name == "ms-wbt-server" {
