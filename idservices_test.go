@@ -1,9 +1,10 @@
 package main
 
 import (
+	"os"
 	"fmt"
-	//"strings"
 	"testing"
+	"path/filepath"
 )
 
 var unicorn_output_1 = `
@@ -255,9 +256,48 @@ func TestRemoveDuplicateServices(t *testing.T) {
 	}
 }
 
+/*
+func addIdentScansToList(service_scan_list []scan, current_service *service) []scan {
+	service_ports := getServicePortsFromScanList(service_scan_list)
+	ident_scan_args := []string{
+		current_service.target
+	}
+	// add all identified services ports to the scan args
+	// to make 
+	ident_scan_args = append(ident_scan_args, service_ports...)
+	
+}
+*/
 
+func TestAddIdentScansToList(t *testing.T) {
+	service_list := []service {
+		service{"ssh", "127.0.0.1", "22", "initialized"},
+		service{"http", "127.0.0.1", "80", "initialized"},
+		service{"ssh", "127.0.0.1", "31337", "initialized"},
+	}
+	service_ports := getServicePortsFromServiceList(service_list)
+	if len(service_ports) != len(service_list) {
+		t.Errorf("expected 3 service ports, got %v", len(service_ports))
+	}
+	service_scan_list := []scan{}
+	current_service := service{"ident", "127.0.0.1", "113", "initialized"}
+	ident_scan := addIdentScansToList(service_scan_list, service_list, &current_service)
+	// +2 because the args have the target IP and service port in addition to other identified services
+	if len(ident_scan[0].args) != len(service_list) + 2 {
+		t.Errorf("expected %v service ports in ident scan, got %v", len(service_list) + 2, len(ident_scan[0].args))
+	}
+}
 
-
+func TestPerformSecondaryScansFromPreviousRun(t *testing.T) {
+	target := "127.0.0.1"
+	current_dir, _ := os.Getwd()
+	target_file_path := filepath.Join(current_dir, "test/test_recon.cuttlelog")
+	identified_services := identifyServicesFromNmapOututFile(target_file_path, target)
+	fmt.Printf("%v", identified_services)
+	if len(identified_services) != 4 {
+		t.Errorf("expected 4 services, got %v", len(identified_services))
+	}
+}
 
 
 

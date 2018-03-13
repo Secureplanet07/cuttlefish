@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"os/user"
 	"os/signal"
+	"io/ioutil"
 	"path/filepath"
 	terminal "github.com/wayneashleyberry/terminal-dimensions"
 )
@@ -488,6 +489,29 @@ func outputProgress(scans []scan) {
 		scanPrint(current_scan, false, false)
 		current_scan.mutex.RUnlock()
 	}
+}
+
+// wrap identifyServices with the data in the nmap_output_file_path file
+func identifyServicesFromNmapOututFile(nmap_output_file_path string, target string) []service {
+	// if file doesn't exist, error out
+	if _, err := os.Stat(nmap_output_file_path); os.IsNotExist(err) {
+		error_string := fmt.Sprintf("[!] nmap output file (%v) does not exist", nmap_output_file_path)
+		colorPrint(error_string, string_format.red, logging, true)
+		os.Exit(0)
+	}
+	// read file, error out if not
+	contents, err := ioutil.ReadFile(nmap_output_file_path)
+	if err != nil {
+		error_string := fmt.Sprintf("[!] could not read nmap output file (%v)", nmap_output_file_path)
+		colorPrint(error_string, string_format.red, logging, true)
+		os.Exit(0)
+	}
+
+	// convert []byte to string
+	string_contents := string(contents)
+
+	// return the output of identifyServices
+	return identifyServices("nmap", string_contents, target)
 }
 
 // identifies both open and closed running services
@@ -994,6 +1018,34 @@ func addRDPScansToList(service_scan_list []scan, current_service *service) []sca
 	return service_scan_list
 }
 
+func getServicePortsFromServiceList(service_list []service) []string {
+	service_ports := []string{}
+	for i := 0; i < len(service_list); i++ {
+		current_port := service_list[i].port
+		service_ports = append(service_ports, current_port)
+	}
+	return service_ports
+}
+
+func addIdentScansToList(service_scan_list []scan, service_list []service, current_service *service) []scan {
+	service_ports := getServicePortsFromServiceList(service_list)
+	ident_scan_args := []string{
+		current_service.target,
+		current_service.port,
+	}
+	// add all identified services ports to the scan args
+	// to make 
+	ident_scan_args = append(ident_scan_args, service_ports...)
+	ident_scan := createOSServiceScan(
+		current_service,
+		"ident-user-enum",
+		"ident-user-enum",
+		ident_scan_args,
+	)
+	service_scan_list = append(service_scan_list, ident_scan)
+	return service_scan_list
+}
+
 // TODO: transforms a list of services into a list of scans
 // converts services identified by nmap output into `scan` structs for
 // downstream processing.
@@ -1002,7 +1054,7 @@ func makeServiceScanList(service_list []service) []scan {
 	services covered by reconscan.py:
 		[x] ssh
 		[x] smtp
-		[ ] snmp
+		[x] snmp
 		[ ] domain
 		[x] ftp
 		[x] http/s
@@ -1019,6 +1071,8 @@ func makeServiceScanList(service_list []service) []scan {
 			service_scan_list = addSSHScansToList(service_scan_list, current_service)
 		} else if current_service.name == "telnet" {
 			service_scan_list = addTelnetScansToList(service_scan_list, current_service)
+		} else if current_service.name == "ident" {
+			service_scan_list = addIdentScansToList(service_scan_list, service_list, current_service)
 		} else if current_service.name == "smtp" {
 			service_scan_list = addSMTPScansToList(service_scan_list, current_service)
 		} else if current_service.name == "snmp" {
@@ -1060,6 +1114,7 @@ func parseScanInterface(given_interface string) string {
 func main() {
 	// initialize the scans so we can clean them up on exit Ctl-C
 	var scans []scan
+	var identified_services []service
 
 	// sig-term handler
 	c := make(chan os.Signal, 2)
@@ -1077,6 +1132,7 @@ func main() {
 	scan_inter	:= flag.String("i", "", "Interface to scan on (eth0)")
 	udp 		:= flag.Bool("u", false, "perform recon UDP scan")
 	output_path	:= flag.String("l", "", "location of output log file")
+	from_file	:= flag.String("f", "d34db33f", "run secondary scans from nmap output file (non-greppable format)")
 	testing		:= flag.Bool("testing", false, "use test executables for enum output")
 	flag.Parse()
 
@@ -1192,91 +1248,104 @@ func main() {
 		}
 	}
 	
-	spoof_service := &service{"all", *target, "all", "all"}
-	if *initial_scan == "nmap" {
-		nmap_tcp_scan := createOSServiceScan(spoof_service, "nmap-tcp-recon", "nmap", []string{})
-		nmap_udp_scan := createOSServiceScan(spoof_service, "nmap-udp-recon", "nmap", []string{})
-		nmap_tcp_scan.args = []string{}
-		nmap_udp_scan.args = []string{}
-		if *scan_level == 1 {
-			nmap_tcp_scan.args = []string{"-vv", "-A", "-Pn", *target}
-			nmap_udp_scan.args = []string{"-vv", "-A", "-Pn", "-sU", *target}
-		} else if *scan_level == 2 {
-			nmap_tcp_scan.args = []string{"-vv", "-A", "-Pn", "--top-ports", "2000", *target}
-			nmap_udp_scan.args = []string{"-vv", "-A", "-Pn", "-sU", "--top-ports", "1000", *target}
-		} else {
-			nmap_tcp_scan.args = []string{"-vv", "-A", "-Pn", "-sS", "-p-", *target}
-			nmap_udp_scan.args = []string{"-vv", "-A", "-Pn", "-sU", "--top-ports", "2000", *target}
-		}
-		
-		if debug {
-			initial1 := fmt.Sprintf("[debug] nmap tcp: %v", scanAsCommandLine(&nmap_tcp_scan))
-			initial2 := fmt.Sprintf("[debug] nmap udp: %v", scanAsCommandLine(&nmap_udp_scan))
-			regularPrint(initial1, logging, true)
-			regularPrint(initial2, logging, true)
-		}
-		
-		if os.Getuid() == 0 {
-			if *udp == true {
-				getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
-				udp_string := fmt.Sprintf("\t[+] UDP scanning with nmap (-u True)")
-				colorPrint(getuid_string, string_format.green, logging, true)
-				colorPrint(udp_string, string_format.green, logging, true)
-				scans = append(scans, nmap_udp_scan)
+	// if we are going to perform our recon scans and are not pulling from an old nmap output file:
+	if *from_file == "d34db33f" {
+		spoof_service := &service{"all", *target, "all", "all"}
+		if *initial_scan == "nmap" {
+			nmap_tcp_scan := createOSServiceScan(spoof_service, "nmap-tcp-recon", "nmap", []string{})
+			nmap_udp_scan := createOSServiceScan(spoof_service, "nmap-udp-recon", "nmap", []string{})
+			nmap_tcp_scan.args = []string{}
+			nmap_udp_scan.args = []string{}
+			if *scan_level == 1 {
+				nmap_tcp_scan.args = []string{"-vv", "-A", "-Pn", *target}
+				nmap_udp_scan.args = []string{"-vv", "-A", "-Pn", "-sU", *target}
+			} else if *scan_level == 2 {
+				nmap_tcp_scan.args = []string{"-vv", "-A", "-Pn", "--top-ports", "2000", *target}
+				nmap_udp_scan.args = []string{"-vv", "-A", "-Pn", "-sU", "--top-ports", "1000", *target}
 			} else {
-				getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
-				udp_string := fmt.Sprintf("\t[!] UDP scanning not performed (-u False)")
-				colorPrint(getuid_string, string_format.green, logging, true)
-				colorPrint(udp_string, string_format.yellow, logging, true)
+				nmap_tcp_scan.args = []string{"-vv", "-A", "-Pn", "-sS", "-p-", *target}
+				nmap_udp_scan.args = []string{"-vv", "-A", "-Pn", "-sU", "--top-ports", "2000", *target}
 			}
 			
-			scans = append(scans, nmap_tcp_scan)
+			if debug {
+				initial1 := fmt.Sprintf("[debug] nmap tcp: %v", scanAsCommandLine(&nmap_tcp_scan))
+				initial2 := fmt.Sprintf("[debug] nmap udp: %v", scanAsCommandLine(&nmap_udp_scan))
+				regularPrint(initial1, logging, true)
+				regularPrint(initial2, logging, true)
+			}
 			
+			if os.Getuid() == 0 {
+				if *udp == true {
+					getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
+					udp_string := fmt.Sprintf("\t[+] UDP scanning with nmap (-u True)")
+					colorPrint(getuid_string, string_format.green, logging, true)
+					colorPrint(udp_string, string_format.green, logging, true)
+					scans = append(scans, nmap_udp_scan)
+				} else {
+					getuid_string := fmt.Sprintf("[+] root privs enabled (GUID: %v)", os.Getuid())
+					udp_string := fmt.Sprintf("\t[!] UDP scanning not performed (-u False)")
+					colorPrint(getuid_string, string_format.green, logging, true)
+					colorPrint(udp_string, string_format.yellow, logging, true)
+				}
+				
+				scans = append(scans, nmap_tcp_scan)
+				
+			} else {
+				getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), UDP scanning not performed", os.Getuid())
+				colorPrint(getuid_string, string_format.yellow, logging, true)
+				// don't bother with UDP since we can't w/o root
+				scans = append(scans, nmap_tcp_scan)
+			}
+		} else if *initial_scan == "unicorn" {
+			colorPrint("[*] performing initial recon unicornscan", string_format.green, logging, true)
+			unicorn_scan := createOSServiceScan(spoof_service, "unicorn-recon", "unicornscan", []string{})
+			target_string := fmt.Sprintf("%v:a", *target)
+			unicorn_scan.args = []string{"-i", scan_interface, "-mT", target_string}
+			scans = append(scans, unicorn_scan)
 		} else {
-			getuid_string := fmt.Sprintf("[!] not executed as root (GUID: %v), UDP scanning not performed", os.Getuid())
-			colorPrint(getuid_string, string_format.yellow, logging, true)
-			// don't bother with UDP since we can't w/o root
-			scans = append(scans, nmap_tcp_scan)
+			colorPrint("[!] please choose a valid initial scan type: (nmap | unicorn) [-i nmap | -i unicorn]", string_format.red, logging, true)
+			os.Exit(0)
 		}
-	} else if *initial_scan == "unicorn" {
-		colorPrint("[*] performing initial recon unicornscan", string_format.green, logging, true)
-		unicorn_scan := createOSServiceScan(spoof_service, "unicorn-recon", "unicornscan", []string{})
-		target_string := fmt.Sprintf("%v:a", *target)
-		unicorn_scan.args = []string{"-i", scan_interface, "-mT", target_string}
-		scans = append(scans, unicorn_scan)
-	} else {
-		colorPrint("[!] please choose a valid initial scan type: (nmap | unicorn) [-i nmap | -i unicorn]", string_format.red, logging, true)
-		os.Exit(0)
-	}
 
 
-	if debug {
-		regularPrint("[*] running the following scans:", logging, true)
+		if debug {
+			regularPrint("[*] running the following scans:", logging, true)
+			for i := 0; i < len(scans); i++ {
+				scan_print := fmt.Sprintf("\t%v", scanAsCommandLine(&scans[i]))
+				regularPrint(scan_print, logging, true)
+			}
+		}	
+
+		// setup the scan channel
+		recon_scan_channel := make(chan bool)
+		
+		// pass by reference so we update the shared struct value
+		colorPrint("[*] starting initial recon scans", string_format.blue,logging, true)
 		for i := 0; i < len(scans); i++ {
-			scan_print := fmt.Sprintf("\t%v", scanAsCommandLine(&scans[i]))
-			regularPrint(scan_print, logging, true)
+			go performScan(*target, &scans[i])
 		}
-	}	
+		go scanProgress(scans, *target, recon_scan_channel)
+		// block on recon scan channel 
+		<-recon_scan_channel
 
-	// setup the scan channel
-	recon_scan_channel := make(chan bool)
-	
-	// pass by reference so we update the shared struct value
-	colorPrint("[*] starting initial recon scans", string_format.blue,logging, true)
-	for i := 0; i < len(scans); i++ {
-		go performScan(*target, &scans[i])
+		// now let's find services from the recon scan results
+		identified_services = identifyServices(*initial_scan,scans[0].results, *target)
+
+		// add udp scans if we did them
+		if os.Getuid() == 0 && len(scans) > 1 {
+			identified_udp_services := identifyServices(*initial_scan,scans[1].results, *target)
+			identified_services := append(identified_services, identified_udp_services...)
+			identified_services = removeDuplicateServices(identified_services)
+		}
+		
+	} else {
+		// -----------------------------
+		// FROM FILE SETUP
+		// -----------------------------		
+		prev_file_path := *from_file
+		identified_services = identifyServicesFromNmapOututFile(prev_file_path, *target)
 	}
-	go scanProgress(scans, *target, recon_scan_channel)
-	// block on recon scan channel 
-	<-recon_scan_channel
-	
-	// now let's find services from the recon scan results
-	identified_services := identifyServices(*initial_scan,scans[0].results, *target)
-	if os.Getuid() == 0 && len(scans) > 1 {
-		identified_udp_services := identifyServices(*initial_scan,scans[1].results, *target)
-		identified_services := append(identified_services, identified_udp_services...)
-		identified_services = removeDuplicateServices(identified_services)
-	}
+
 	if len(identified_services) == 0 {
 		colorPrint("[-] no services identified", string_format.red, logging, true)
 		colorPrint("\t[!] try different scan options", string_format.yellow, logging, true)

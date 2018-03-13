@@ -34,7 +34,8 @@ rm /usr/local/bin/cuttlefish
 ln -s $INSTALLDIR/cuttlefish /usr/local/bin/cuttlefish 
 echo "[*] cuttlefish: $(which cuttlefish)"
 echo "[*] installing non-distro tools"
-apt-get install gobuster
+apt-get install gobuster -y
+apt-get install ident-user-enum -y
 echo "[*] downloading SecLists to ~/Documents/tools/"
 mkdir ~/Documents/tools
 cd ~/Documents/tools

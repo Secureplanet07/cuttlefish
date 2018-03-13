@@ -1,0 +1,142 @@
+[*] running command: nmap -vv -A -Pn -sS -p- 10.11.1.136 
+
+Starting Nmap 7.60 ( https://nmap.org ) at 2018-03-13 16:00 EDT
+NSE: Loaded 146 scripts for scanning.
+NSE: Script Pre-scanning.
+NSE: Starting runlevel 1 (of 2) scan.
+Initiating NSE at 16:00
+Completed NSE at 16:00, 0.00s elapsed
+NSE: Starting runlevel 2 (of 2) scan.
+Initiating NSE at 16:00
+Completed NSE at 16:00, 0.00s elapsed
+Initiating ARP Ping Scan at 16:00
+Scanning 10.11.1.136 [1 port]
+Completed ARP Ping Scan at 16:00, 0.20s elapsed (1 total hosts)
+Initiating Parallel DNS resolution of 1 host. at 16:00
+Completed Parallel DNS resolution of 1 host. at 16:00, 0.04s elapsed
+Initiating SYN Stealth Scan at 16:00
+Scanning 10.11.1.136 [65535 ports]
+Discovered open port 139/tcp on 10.11.1.136
+Discovered open port 113/tcp on 10.11.1.136
+Discovered open port 445/tcp on 10.11.1.136
+Discovered open port 22/tcp on 10.11.1.136
+SYN Stealth Scan Timing: About 4.83% done; ETC: 16:10 (0:10:11 remaining)
+Increasing send delay for 10.11.1.136 from 0 to 5 due to 956 out of 3186 dropped probes since last increase.
+SYN Stealth Scan Timing: About 6.88% done; ETC: 16:14 (0:13:46 remaining)
+SYN Stealth Scan Timing: About 12.37% done; ETC: 16:12 (0:10:44 remaining)
+SYN Stealth Scan Timing: About 18.66% done; ETC: 16:12 (0:10:06 remaining)
+SYN Stealth Scan Timing: About 23.61% done; ETC: 16:12 (0:09:07 remaining)
+SYN Stealth Scan Timing: About 29.12% done; ETC: 16:12 (0:08:26 remaining)
+SYN Stealth Scan Timing: About 42.48% done; ETC: 16:13 (0:07:48 remaining)
+SYN Stealth Scan Timing: About 47.39% done; ETC: 16:13 (0:07:04 remaining)
+SYN Stealth Scan Timing: About 52.03% done; ETC: 16:13 (0:06:20 remaining)
+SYN Stealth Scan Timing: About 57.16% done; ETC: 16:13 (0:05:31 remaining)
+SYN Stealth Scan Timing: About 62.69% done; ETC: 16:13 (0:04:52 remaining)
+SYN Stealth Scan Timing: About 69.20% done; ETC: 16:13 (0:04:10 remaining)
+SYN Stealth Scan Timing: About 74.73% done; ETC: 16:13 (0:03:20 remaining)
+SYN Stealth Scan Timing: About 79.87% done; ETC: 16:13 (0:02:39 remaining)
+SYN Stealth Scan Timing: About 86.30% done; ETC: 16:12 (0:01:45 remaining)
+SYN Stealth Scan Timing: About 91.44% done; ETC: 16:12 (0:01:05 remaining)
+Completed SYN Stealth Scan at 16:12, 762.54s elapsed (65535 total ports)
+Initiating Service scan at 16:12
+Scanning 4 services on 10.11.1.136
+Completed Service scan at 16:13, 11.65s elapsed (4 services on 1 host)
+Initiating OS detection (try #1) against 10.11.1.136
+Retrying OS detection (try #2) against 10.11.1.136
+Retrying OS detection (try #3) against 10.11.1.136
+Retrying OS detection (try #4) against 10.11.1.136
+Retrying OS detection (try #5) against 10.11.1.136
+NSE: Script scanning 10.11.1.136.
+NSE: Starting runlevel 1 (of 2) scan.
+Initiating NSE at 16:13
+Completed NSE at 16:13, 5.07s elapsed
+NSE: Starting runlevel 2 (of 2) scan.
+Initiating NSE at 16:13
+Completed NSE at 16:13, 0.01s elapsed
+Nmap scan report for 10.11.1.136
+Host is up, received arp-response (0.19s latency).
+Scanned at 2018-03-13 16:00:07 EDT for 796s
+Not shown: 65531 closed ports
+Reason: 65531 resets
+PORT    STATE SERVICE     REASON         VERSION
+22/tcp  open  ssh         syn-ack ttl 64 OpenSSH 4.3p2 Debian 9 (protocol 2.0)
+|_auth-owners: root
+| ssh-hostkey: 
+|   1024 88:23:98:0d:9d:8a:20:59:35:b8:14:12:14:d5:d0:44 (DSA)
+| ssh-dss AAAAB3NzaC1kc3MAAACBALy8V1YxM59YxGMOF/qY2N7jOCfS9RykmqkvNcTrtXRqmaCN45wrEH8OIwq6jNUR378dOB1SI8KgSU1pJCtwsTGFAGmijkO4X9JZGokngMy+oBuy+hMw7kkDOQ3B/oQd+MBHUZfpKxOzFwt21kWxOnSlVIjtWCETJq9CohtGyZ9zAAAAFQD8MciO6/346fanxvqmcZr+TtQEzwAAAIEApD0/kDro/xT0xJYl8W5sXRJ+gagaivAYAETOHJGPLR6Z7ACJz5wQVD9EeN5TPGFe6utlhF7EcA6o3bpL+J+JMO2Vfi5LDoL/409DbDPAQAWVxdRWluZ+ocJig9mv4WjQp7+z7bO58jF9I2SJ7BGAwL9wpm72UUUPpVlAcZKJVHMAAACAZ8CAjc3F8PIDGPxFtbtBuRNSehvVq7eoWIVRWXk502EwB9QszHxx7kyqyxc8Nnt9obaEMHDTAtcZACfWk059pjpMDHqczz0eaF4WvStQpgEw3jOihRznDzRyqz4HGuh3pmhMsWHrVSz+CnnxuQTQU7CuxFPsvQR+pmKN93MKQgo=
+|   2048 6b:5d:04:71:76:78:56:96:56:92:a8:02:30:73:ee:fa (RSA)
+|_ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA10OWcx61a5eqZIopAJGgzTYwysjjNFbLKDEypxIIb80V5O7M5bmNWYvm39VTMYsjUT4yRFF0IV5BhuMUtd4jqsSewJPGh6JWyE0NjuVLIeSxH7cmvn4EtLoSY4GA1CDzRs+0eMCIKYWpGyFRn1bDxRYJQYutVaG7af7dg0fItkgn0JUdpxMSlPXrffcL2CMwufsxCx6iJwmw8TzJYPaREzM69AfRXjoyQmjUVyEKbLpCLq/yYCjSJ2CEENnZCqWEiPhtZwOCwpGl9ZYerQ1PF3xmqKKGisYLxtFeeDVQyyqEM5mOVkBLY9GVHZVkRClkCcI2phrslp4gRKHl6Diqxw==
+113/tcp open  ident       syn-ack ttl 64
+|_auth-owners: identd
+139/tcp open  netbios-ssn syn-ack ttl 64 Samba smbd 3.X - 4.X (workgroup: LOCAL)
+|_auth-owners: root
+445/tcp open  netbios-ssn syn-ack ttl 64 Samba smbd 3.0.24 (workgroup: LOCAL)
+|_auth-owners: root
+MAC Address: 00:50:56:B8:7D:96 (VMware)
+No exact OS matches for host (If you know what OS is running on it, see https://nmap.org/submit/ ).
+TCP/IP fingerprint:
+OS:SCAN(V=7.60%E=4%D=3/13%OT=22%CT=1%CU=36305%PV=Y%DS=1%DC=D%G=Y%M=005056%T
+OS:M=5AA830E3%P=x86_64-pc-linux-gnu)SEQ(SP=C7%GCD=1%ISR=C9%TI=Z%II=I%TS=8)O
+OS:PS(O1=M529ST11NW6%O2=M529ST11NW6%O3=M529NNT11NW6%O4=M529ST11NW6%O5=M529S
+OS:T11NW6%O6=M529ST11)WIN(W1=16A0%W2=16A0%W3=16A0%W4=16A0%W5=16A0%W6=16A0)E
+OS:CN(R=Y%DF=Y%T=40%W=16D0%O=M529NNSNW6%CC=N%Q=)T1(R=Y%DF=Y%T=40%S=O%A=S+%F
+OS:=AS%RD=0%Q=)T2(R=N)T3(R=N)T4(R=N)T5(R=Y%DF=Y%T=40%W=0%S=Z%A=S+%F=AR%O=%R
+OS:D=0%Q=)T6(R=N)T7(R=N)U1(R=Y%DF=N%T=40%IPL=164%UN=0%RIPL=G%RID=G%RIPCK=G%
+OS:RUCK=G%RUD=G)IE(R=Y%DFI=N%T=40%CD=S)
+
+Uptime guess: 0.952 days (since Mon Mar 12 17:23:12 2018)
+Network Distance: 1 hop
+TCP Sequence Prediction: Difficulty=199 (Good luck!)
+IP ID Sequence Generation: All zeros
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Host script results:
+|_clock-skew: mean: -6m59s, deviation: 0s, median: -6m59s
+| nbstat: NetBIOS name: SUFFERANCE, NetBIOS user: <unknown>, NetBIOS MAC: <unknown> (unknown)
+| Names:
+|   SUFFERANCE<00>       Flags: <unique><active>
+|   SUFFERANCE<03>       Flags: <unique><active>
+|   SUFFERANCE<20>       Flags: <unique><active>
+|   \x01\x02__MSBROWSE__\x02<01>  Flags: <group><active>
+|   THINC.LOCAL<1d>      Flags: <unique><active>
+|   THINC.LOCAL<1e>      Flags: <group><active>
+|   THINC.LOCAL<00>      Flags: <group><active>
+| Statistics:
+|   00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+|   00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+|_  00 00 00 00 00 00 00 00 00 00 00 00 00 00
+| p2p-conficker: 
+|   Checking for Conficker.C or higher...
+|   Check 1 (port 63352/tcp): CLEAN (Couldn't connect)
+|   Check 2 (port 47029/tcp): CLEAN (Couldn't connect)
+|   Check 3 (port 24227/udp): CLEAN (Failed to receive data)
+|   Check 4 (port 37051/udp): CLEAN (Failed to receive data)
+|_  0/4 checks are positive: Host is CLEAN or ports are blocked
+| smb-os-discovery: 
+|   OS: Unix (Samba 3.0.24)
+|   NetBIOS computer name: 
+|   Workgroup: THINC.LOCAL\x00
+|_  System time: 2018-03-13T16:06:20-04:00
+| smb-security-mode: 
+|   account_used: guest
+|   authentication_level: share (dangerous)
+|   challenge_response: supported
+|_  message_signing: disabled (dangerous, but default)
+|_smb2-security-mode: Couldn't establish a SMBv2 connection.
+|_smb2-time: Protocol negotiation failed (SMB2)
+
+TRACEROUTE
+HOP RTT       ADDRESS
+1   186.46 ms 10.11.1.136
+
+NSE: Script Post-scanning.
+NSE: Starting runlevel 1 (of 2) scan.
+Initiating NSE at 16:13
+Completed NSE at 16:13, 0.00s elapsed
+NSE: Starting runlevel 2 (of 2) scan.
+Initiating NSE at 16:13
+Completed NSE at 16:13, 0.00s elapsed
+Read data files from: /usr/bin/../share/nmap
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 796.83 seconds
+           Raw packets sent: 67796 (2.988MB) | Rcvd: 66656 (2.670MB)
