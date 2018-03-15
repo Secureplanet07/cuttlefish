@@ -1175,7 +1175,7 @@ func main() {
 	cuttle_header_4 := "__o___O____,-`  `\\_*         v0.1     \\._____o___coastal"
 	cuttle_header_5 := "[~] supports identification and enumeration of: "
 	cuttle_header_6 := "\tftp, ssh, telnet, smtp, snmp, ftp, http, https"
-	cuttle_header_7 := "\tsmb, ms-sql, rdp"
+	cuttle_header_7 := "\tsmb, ms-sql, rdp, ident"
 	colorPrint(cuttle_header_1, string_format.blue,logging, true)
 	colorPrint(cuttle_header_2, string_format.blue,logging, true)
 	colorPrint(cuttle_header_3, string_format.blue,logging, true)
