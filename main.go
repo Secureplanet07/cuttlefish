@@ -889,7 +889,7 @@ func addHTTPScansToList(service_scan_list []scan, current_service *service) []sc
 		current_service,
 		"nikto-scan",
 		"nikto",
-		[]string{"-h", url_target, "-p", current_service.port},
+		[]string{"-h", url_port_target},
 	)
 	http_nmap_scan_args := []string{
 		"-sV", 
