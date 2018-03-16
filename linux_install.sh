@@ -24,6 +24,7 @@ source ~/.bashrc
 echo "[*] GOPATH: $GOPATH"
 echo "[*] installing go dependencies"
 /usr/local/go/bin/go get -u github.com/wayneashleyberry/terminal-dimensions
+/usr/local/go/bin/go get -u github.com/kardianos/osext
 echo "[*] compiling project"
 /usr/local/go/bin/go build
 echo "[*] linking to /usr/local/bin"

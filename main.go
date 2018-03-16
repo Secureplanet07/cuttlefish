@@ -17,6 +17,7 @@ import (
 	"os/signal"
 	"io/ioutil"
 	"path/filepath"
+	osext "github.com/kardianos/osext"
 	terminal "github.com/wayneashleyberry/terminal-dimensions"
 )
 
@@ -27,7 +28,7 @@ import (
 */
 
 // debug?
-var debug = true
+var debug = false
 
 // start time (for log files)
 var scan_start = time.Now()
@@ -42,13 +43,14 @@ var logging = true
 var logfile_root_path string
 var logfile_path string
 
-// location of enum scripts
-var working_dir,_ = os.Getwd()
-var script_dir = filepath.Join(working_dir, "scripts")
-
 // user info
 var current_user, _ = user.Current()
 var user_homedir = current_user.HomeDir
+
+// location of enum scripts
+var binary_location, binary_location_err = osext.ExecutableFolder()
+var actual_binary_location, actual_binary_location_err = filepath.EvalSymlinks(filepath.Join(binary_location, "cuttlefish"))
+var script_dir = filepath.Join(actual_binary_location, "..", "scripts")
 
 // arguments to scans
 var hydra_default_user_wordlist = 	filepath.Join(user_homedir, "Documents/tools/SecLists/Usernames/top_shortlist.txt")
@@ -1248,9 +1250,25 @@ func main() {
 		}
 	}
 
+	// make sure script dir is all good
+	if binary_location_err != nil {
+		error_string := fmt.Sprintf("[!] couldn't determine binary location: %v", binary_location_err)
+		colorPrint(error_string, string_format.red, logging, true)
+		os.Exit(0)
+	}
+	if actual_binary_location_err != nil {
+		error_string := fmt.Sprintf("[!] couldn't determine actual binary location (follow symlink): %v", actual_binary_location_err)
+		colorPrint(error_string, string_format.red, logging, true)
+		os.Exit(0)
+	}
+
 	// print relevant state info if debugging
 	if debug {
+		debug_binary_location := fmt.Sprintf("[*] binary location: %v", binary_location)
+		debug_actual_binary_location := fmt.Sprintf("[*] actual binary location: %v", actual_binary_location)
 		debug_script_dir := fmt.Sprintf("[*] script dir: %v", script_dir)
+		colorPrint(debug_binary_location, string_format.blue, logging, true)
+		colorPrint(debug_actual_binary_location, string_format.blue, logging, true)
 		colorPrint(debug_script_dir, string_format.blue, logging, true)
 	}
 	
