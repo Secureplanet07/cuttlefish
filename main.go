@@ -27,7 +27,7 @@ import (
 */
 
 // debug?
-var debug = false
+var debug = true
 
 // start time (for log files)
 var scan_start = time.Now()
@@ -1246,6 +1246,12 @@ func main() {
 			regularPrint(fix_command, logging, true)
 			os.Exit(0)
 		}
+	}
+
+	// print relevant state info if debugging
+	if debug {
+		debug_script_dir := fmt.Sprintf("[*] script dir: %v", script_dir)
+		colorPrint(debug_script_dir, string_format.blue, logging, true)
 	}
 	
 	// if we are going to perform our recon scans and are not pulling from an old nmap output file:
