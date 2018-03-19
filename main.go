@@ -53,12 +53,12 @@ var actual_binary_location, actual_binary_location_err = filepath.EvalSymlinks(f
 var script_dir = filepath.Join(actual_binary_location, "..", "scripts")
 
 // arguments to scans
-var hydra_default_user_wordlist = 	filepath.Join(user_homedir, "Documents/tools/SecLists/Usernames/top_shortlist.txt")
-var hydra_default_user_passlist = 	filepath.Join(user_homedir, "Documents/tools/SecLists/Passwords/best1050.txt")
-var gobuster_default_dirlist = 		filepath.Join(user_homedir, "Documents/tools/SecLists/Discovery/Web_Content/raft-medium-directories.txt")
-var gobuster_default_filelist = 	filepath.Join(user_homedir, "Documents/tools/SecLists/Discovery/Web_Content/raft-medium-files.txt")
-var gobuster_default_cgilist = 		filepath.Join(user_homedir, "Documents/tools/SecLists/Discovery/Web_Content/cgis.txt")
-var smtp_default_namelist = 		filepath.Join(user_homedir, "Documents/tools/SecLists/Usernames/top_shortlist.txt")
+var hydra_default_user_wordlist = 	filepath.Join(user_homedir, "Documents/tools/SecLists/Usernames/top-usernames-shortlist.txt")
+var hydra_default_user_passlist = 	filepath.Join(user_homedir, "Documents/tools/SecLists/Passwords/probable-v2-top1575.txt")
+var gobuster_default_dirlist = 		filepath.Join(user_homedir, "Documents/tools/SecLists/Discovery/Web-Content/raft-large-directories.txt")
+var gobuster_default_filelist = 	filepath.Join(user_homedir, "Documents/tools/SecLists/Discovery/Web-Content/raft-large-files.txt")
+var gobuster_default_cgilist = 		filepath.Join(user_homedir, "Documents/tools/SecLists/Discovery/Web-Content/cgis.txt")
+var smtp_default_namelist = 		filepath.Join(user_homedir, "Documents/tools/SecLists/Usernames/top-usernames-shortlist.txt")
 
 // stuff to keep track of the prints so we can update the terminal ouput
 // properly when we print past the end of the terminal
