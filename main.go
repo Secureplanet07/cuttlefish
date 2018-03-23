@@ -970,9 +970,47 @@ func addSMBScansToList(service_scan_list []scan, current_service *service) []sca
 		"enum4linux",
 		smb_enumlinux_scan_args,
 	)
+	// nmap --script smb-brute.nse -p445 10.11.1.31
+	smb_brute_tcp_scan_args := []string{
+		"-p",
+		current_service.port,
+		"--script",
+		"smb-brute.nse",
+		current_service.target,
+	}
+	smb_brute_tcp_scan := createOSServiceScan(
+		current_service,
+		"smb-tcp-brute",
+		"nmap",
+		smb_brute_tcp_scan_args,
+	)
+	// sudo nmap -sU -sS --script smb-brute.nse -p U:137,T:139 10.11.1.31
+	smb_brute_udp_scan_args := []string{
+		"-sU",
+		"-sS",
+		"--script",
+		"smb-brute.nse",
+		"-p",
+		current_service.port,
+		"U:137,T:139",
+		current_service.target,
+	}
+	smb_brute_udp_scan := createOSServiceScan(
+		current_service,
+		"smb-udp-brute",
+		"nmap",
+		smb_brute_udp_scan_args,
+	)
 	service_scan_list = append(service_scan_list, smb_nmap_vuln_scan)
 	service_scan_list = append(service_scan_list, smb_nmap_enum_scan)
 	service_scan_list = append(service_scan_list, smb_enumlinux_scan)
+
+	// add our brute force nmap scans separately
+	service_scan_list = append(service_scan_list, smb_brute_tcp_scan)
+	// can only run udp if we are root
+	if os.Getuid() == 0 {
+		service_scan_list = append(service_scan_list, smb_brute_udp_scan)
+	}
 	return service_scan_list
 }
 
