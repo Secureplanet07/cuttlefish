@@ -1086,6 +1086,24 @@ func addIdentScansToList(service_scan_list []scan, service_list []service, curre
 	return service_scan_list
 }
 
+func addMSRPCScansToList(service_scan_list []scan, service_list []service, current_service *service) []scan {
+	//nmap -script=msrpc-enum,rpcinfo IP.IP.IP.IP
+	msrpc_scan_args := []string{
+		"--script=msrpc-enum,rpcinfo",
+		"-p",
+		current_service.port,
+		current_service.target,
+	}
+	msrpc_scan := createOSServiceScan(
+		current_service,
+		"msrpc-enum",
+		"nmap",
+		msrpc_scan_args,
+	)
+	service_scan_list = append(service_scan_list, msrpc_scan)
+	return service_scan_list
+}
+
 // TODO: transforms a list of services into a list of scans
 // converts services identified by nmap output into `scan` structs for
 // downstream processing.
@@ -1113,6 +1131,8 @@ func makeServiceScanList(service_list []service) []scan {
 			service_scan_list = addTelnetScansToList(service_scan_list, current_service)
 		} else if current_service.name == "ident" {
 			service_scan_list = addIdentScansToList(service_scan_list, service_list, current_service)
+		} else if current_service.name == "msrpc" {
+			service_scan_list = addMSRPCScansToList(service_scan_list, service_list, current_service)
 		} else if current_service.name == "smtp" {
 			service_scan_list = addSMTPScansToList(service_scan_list, current_service)
 		} else if current_service.name == "snmp" {
