@@ -521,7 +521,7 @@ func identifyServices(scan_type string, scan_output string, target string) []ser
 	var identified_services []service
 	if scan_type == "nmap" {
 		// grab '22/tcp' from the beginning of the line
-		var validService = regexp.MustCompile(`^(\d+/[a-z]+)\s+\w+\s+[A-z,a-z,0-9,-]+`)
+		var validService = regexp.MustCompile(`^(\d+/[a-z]+)\s+\w+\s+[-,\/,A-z,a-z,0-9]+`)
 		// grab '  ssh  ' from the validated line
 		//var serviceType = regexp.MustCompile(`\s[A-z,a-z,0-9,-]+`)
 		all_lines := strings.Split(scan_output, "\n")
@@ -1104,6 +1104,10 @@ func addMSRPCScansToList(service_scan_list []scan, service_list []service, curre
 	return service_scan_list
 }
 
+func serviceInName(parsed_service string, needle string) bool {
+	return strings.Contains(parsed_service, needle)
+}
+
 // TODO: transforms a list of services into a list of scans
 // converts services identified by nmap output into `scan` structs for
 // downstream processing.
@@ -1123,32 +1127,34 @@ func makeServiceScanList(service_list []service) []scan {
 	for i := 0; i < len(service_list); i++ {
 		current_service := &service_list[i]
 		// set up scans for identified services
-		if current_service.name == "ftp" {
+		if serviceInName(current_service.name, "ftp") {
 			service_scan_list = addFTPScansToList(service_scan_list, current_service)
-		} else if current_service.name == "ssh" {
+		} else if serviceInName(current_service.name, "ssh") {
 			service_scan_list = addSSHScansToList(service_scan_list, current_service)
-		} else if current_service.name == "telnet" {
+		} else if serviceInName(current_service.name, "telnet") {
 			service_scan_list = addTelnetScansToList(service_scan_list, current_service)
-		} else if current_service.name == "ident" {
+		} else if serviceInName(current_service.name, "ident") {
 			service_scan_list = addIdentScansToList(service_scan_list, service_list, current_service)
-		} else if current_service.name == "msrpc" {
+		} else if serviceInName(current_service.name, "msrpc") {
 			service_scan_list = addMSRPCScansToList(service_scan_list, service_list, current_service)
-		} else if current_service.name == "smtp" {
+		} else if serviceInName(current_service.name, "smtp") {
 			service_scan_list = addSMTPScansToList(service_scan_list, current_service)
-		} else if current_service.name == "snmp" {
+		} else if serviceInName(current_service.name, "snmp") {
 			service_scan_list = addSNMPScansToList(service_scan_list, current_service)
-		} else if current_service.name == "domain" {
+		} else if serviceInName(current_service.name, "domain") {
 			// add domain scans here
-		} else if current_service.name == "http" || current_service.name == "ssl/http" || 
-		strings.Contains(current_service.name, "https") {	
+		} else if serviceInName(current_service.name, "http") || 
+				serviceInName(current_service.name, "ssl/http") || 
+				serviceInName(current_service.name, "https") {	
 			service_scan_list = addHTTPScansToList(service_scan_list, current_service)
-		} else if current_service.name == "microsoft-ds" {
+		} else if serviceInName(current_service.name, "microsoft-ds") {
 			service_scan_list = addSMBScansToList(service_scan_list, current_service)
-		} else if current_service.name == "netbios-ssn" {
+		} else if serviceInName(current_service.name, "netbios-ssn") {
 			service_scan_list = addSMBScansToList(service_scan_list, current_service)
-		} else if current_service.name == "ms-sql" {
+		} else if serviceInName(current_service.name, "ms-sql") {
 			service_scan_list = addMSSQLScansToList(service_scan_list, current_service)
-		} else if current_service.name == "msdrdp" || current_service.name == "ms-wbt-server" {
+		} else if serviceInName(current_service.name, "msdrdp") || 
+				serviceInName(current_service.name, "ms-wbt-server") {
 			service_scan_list = addRDPScansToList(service_scan_list, current_service)
 		}
 	}

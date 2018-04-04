@@ -73,6 +73,7 @@ PORT     STATE  SERVICE
 80/tcp   open   http
 111/tcp  open   rpcbind
 139/tcp  open   netbios-ssn
+443/tcp  open   ssl/http
 445/tcp  open   microsoft-ds
 512/tcp  open   exec
 513/tcp  open   login
@@ -193,6 +194,7 @@ func TestIdentifyServices2(t *testing.T) {
 		[]string{"80","open","http"},
 		[]string{"111","open","rpcbind"},
 		[]string{"139","open","netbios-ssn"},
+		[]string{"443","open","ssl/http"},
 		[]string{"445","open","microsoft-ds"},
 		[]string{"512","open","exec"},
 		[]string{"513","open","login"},
@@ -216,7 +218,7 @@ func TestIdentifyServices2(t *testing.T) {
 	}
 	for i := 0; i < len(nmap_output_2_results); i ++ {
 		if identified[i].name != nmap_output_2_results[i][2] {
-			t.Errorf("issues with service name parsing (%v:%v)", identified[i].name, nmap_output_2_results[i][2])
+			t.Errorf("issues with service name parsing (parsed:%v, expected:%v)", identified[i].name, nmap_output_2_results[i][2])
 		}
 	}
 }
@@ -293,7 +295,7 @@ func TestPerformSecondaryScansFromPreviousRun(t *testing.T) {
 	current_dir, _ := os.Getwd()
 	target_file_path := filepath.Join(current_dir, "test/test_recon.cuttlelog")
 	identified_services := identifyServicesFromNmapOututFile(target_file_path, target)
-	fmt.Printf("%v", identified_services)
+	//fmt.Printf("%v", identified_services)
 	if len(identified_services) != 4 {
 		t.Errorf("expected 4 services, got %v", len(identified_services))
 	}
