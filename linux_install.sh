@@ -14,6 +14,7 @@ then
 	echo "[*] adding go binaries to PATH"
 	echo 'export PATH="$PATH:/usr/local/go/bin"' >> ~/.bashrc
 	source ~/.bashrc
+	export PATH="$PATH:/usr/local/go/bin"
 	echo "[*] PATH: $PATH"
 fi
 echo "[+] golang is installed!"
@@ -21,6 +22,7 @@ cd $INSTALLDIR
 echo "[*] changing gopath to current dir"
 echo 'export GOPATH=$INSTALLDIR' >> ~/.bashrc
 source ~/.bashrc
+export GOPATH=$(pwd)
 echo "[*] GOPATH: $GOPATH"
 echo "[*] installing go dependencies"
 /usr/local/go/bin/go get -u github.com/wayneashleyberry/terminal-dimensions
@@ -30,6 +32,7 @@ echo "[*] compiling project"
 echo "[*] linking to /usr/local/bin"
 echo 'export PATH="$PATH:/usr/local/bin"' >> ~/.bashrc
 source ~/.bashrc
+export PATH="$PATH:/usr/local/bin"
 echo "[*] PATH: $PATH"
 rm /usr/local/bin/cuttlefish
 ln -s $INSTALLDIR/cuttlefish /usr/local/bin/cuttlefish 
