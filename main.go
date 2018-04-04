@@ -848,8 +848,8 @@ func addHTTPScansToList(service_scan_list []scan, current_service *service) []sc
 	url_port_target := fmt.Sprintf("%v:%v", url_target, current_service.port)
 	// if it's an https service, change the url_target to prepend 
 	// https instead of http
-	if strings.Contains(current_service.name, "https") || 
-	current_service.name == "ssl/http" {
+	if serviceInName(current_service.name, "https") || 
+			serviceInName(current_service.name, "ssl/http") {
 		url_target = fmt.Sprintf("https://%v", current_service.target)
 		
 		// add sslscan scan
