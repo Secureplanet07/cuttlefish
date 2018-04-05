@@ -845,11 +845,10 @@ func addSNMPScansToList(service_scan_list []scan, current_service *service) []sc
 func addHTTPScansToList(service_scan_list []scan, current_service *service) []scan {
 	// dynamically alter prefix to either http or https
 	url_target := fmt.Sprintf("http://%v", current_service.target)
-	url_port_target := fmt.Sprintf("%v:%v", url_target, current_service.port)
 	// if it's an https service, change the url_target to prepend 
 	// https instead of http
 	if serviceInName(current_service.name, "https") || 
-			serviceInName(current_service.name, "ssl/http") {
+			serviceInName(current_service.name, "ssl") {
 		url_target = fmt.Sprintf("https://%v", current_service.target)
 		
 		// add sslscan scan
@@ -862,6 +861,8 @@ func addHTTPScansToList(service_scan_list []scan, current_service *service) []sc
 		)
 		service_scan_list = append(service_scan_list, sslscan_scan)
 	}
+	// format this after it would have been modified by HTTPS
+	url_port_target := fmt.Sprintf("%v:%v", url_target, current_service.port)
 	// add port to gobuster
 	gobuster_dir_args := []string{
 		"-u", 
